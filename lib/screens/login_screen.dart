@@ -1,3 +1,4 @@
+import 'package:scalp_mobile_app/screens/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:scalp_mobile_app/screens/signup_screen.dart';
 import '../widgets/logo_placeholder.dart';
@@ -126,8 +127,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   ElevatedButton(
                     onPressed: () {
                       if (_formKey.currentState!.validate()) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Login Successful')),
+                        // For now, we'll just navigate to the home screen
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const HomeScreen()),
                         );
                       }
                     },
