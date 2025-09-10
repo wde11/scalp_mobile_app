@@ -8,7 +8,24 @@ class ProfileScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         actions: [
-          IconButton(icon: const Icon(Icons.settings), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Settings'),
+                  content: const Text('Settings options would be here.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -39,25 +56,49 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             const Text(
-              'Troy Wendell',
+              'John Doe',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const Text(
-              'Online Seller',
+              'john.doe@example.com',
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 30),
-            _buildProfileTextField('Your Email', 'xxx@gmail.com', Icons.email),
-            _buildProfileTextField('Phone Number', '+93123135', Icons.phone),
-            _buildProfileTextField(
-              'Password',
-              'xxx@gmail.com',
-              Icons.lock,
-              true,
+            _buildProfileInfoItem('Phone', '+1 234 567 890', Icons.phone),
+            _buildProfileInfoItem(
+              'Location',
+              'San Francisco, CA',
+              Icons.location_on,
+            ),
+            _buildProfileInfoItem(
+              'Member Since',
+              'June 2023',
+              Icons.calendar_today,
             ),
             const SizedBox(height: 30),
             ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Logout'),
+                    content: const Text('Are you sure you want to logout?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          // Perform logout action
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text('Logout'),
+                      ),
+                    ],
+                  ),
+                );
+              },
               child: const Text('Logout'),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
@@ -69,29 +110,20 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileTextField(
-    String label,
-    String value,
-    IconData icon, [
-    bool isPassword = false,
-  ]) {
+  Widget _buildProfileInfoItem(String label, String value, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      child: Row(
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 5),
-          TextField(
-            controller: TextEditingController(text: value),
-            obscureText: isPassword,
-            decoration: InputDecoration(
-              prefixIcon: Icon(icon),
-              suffixIcon: isPassword ? const Icon(Icons.visibility_off) : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8.0),
-              ),
-            ),
+          Icon(icon, color: Colors.grey),
+          const SizedBox(width: 20),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 5),
+              Text(value, style: const TextStyle(fontSize: 16)),
+            ],
           ),
         ],
       ),

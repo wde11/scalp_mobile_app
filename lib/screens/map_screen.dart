@@ -8,10 +8,12 @@ class MapScreen extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          // Placeholder for the map
-          Container(
-            color: Colors.grey[300],
-            child: const Center(child: Text('Map Placeholder')),
+          // Static map image
+          Image.asset(
+            'assets/images/map_placeholder.png', // Add a map image to your assets
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
           ),
           Positioned(
             top: 40,

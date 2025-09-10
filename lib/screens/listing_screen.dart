@@ -34,10 +34,21 @@ class ListingScreen extends StatelessWidget {
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
                 children: [
-                  _buildListItem('AOC Monitor 24\'', 'Gaming Monitor', '₱6000'),
-                  _buildListItem('Nec Versapro', 'Laptop', '₱4000'),
-                  _buildListItem('RX 570 4 GB', 'Graphics Card', '₱3500'),
                   _buildListItem(
+                    context,
+                    'AOC Monitor 24\'',
+                    'Gaming Monitor',
+                    '₱6000',
+                  ),
+                  _buildListItem(context, 'Nec Versapro', 'Laptop', '₱4000'),
+                  _buildListItem(
+                    context,
+                    'RX 570 4 GB',
+                    'Graphics Card',
+                    '₱3500',
+                  ),
+                  _buildListItem(
+                    context,
                     'ROG Strix Keyboard',
                     'Gaming Keyboard',
                     '₱2000',
@@ -49,14 +60,35 @@ class ListingScreen extends StatelessWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Create Listing'),
+              content: const Text(
+                'This would open a form to create a new listing.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+          );
+        },
         label: const Text('Create Listing'),
         icon: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildListItem(String name, String category, String price) {
+  Widget _buildListItem(
+    BuildContext context,
+    String name,
+    String category,
+    String price,
+  ) {
     return Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,8 +126,15 @@ class ListingScreen extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.add_circle),
-                      onPressed: () {},
+                      icon: const Icon(Icons.add_shopping_cart),
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('$name added to cart.'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

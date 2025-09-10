@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:scalp_mobile_app/screens/login_screen.dart';
+import 'package:scalp_mobile_app/theme/app_theme.dart';
 
 void main() {
   runApp(const MyApp());
@@ -12,10 +13,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Scalp Mobile App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF015DBC)),
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
+      theme: AppTheme.theme,
       home: const LoginScreen(),
     );
   }

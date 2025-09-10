@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:scalp_mobile_app/theme/app_theme.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -20,6 +21,7 @@ class DashboardScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildStatCard(
+                  context,
                   'Items Bought',
                   '10',
                   'Updated 2 hrs ago',
@@ -27,42 +29,74 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildStatCard('Items sold', '3', 'Updated 30 mins ago'),
+                child: _buildStatCard(
+                  context,
+                  'Items sold',
+                  '3',
+                  'Updated 30 mins ago',
+                ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          _buildSpecialEventCard(),
+          _buildSpecialEventCard(context),
           const SizedBox(height: 16),
-          _buildMarketplaceCard(),
+          _buildMarketplaceCard(context),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String title, String value, String updateInfo) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(updateInfo, style: const TextStyle(color: Colors.grey)),
-          ],
+  Widget _buildStatCard(
+    BuildContext context,
+    String title,
+    String value,
+    String updateInfo,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(title),
+            content: Text('Detailed information about $title.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      },
+      child: Card(
+        color: Theme.of(context).colorScheme.tertiary,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: TextStyle(color: AppTheme.textColor)),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(updateInfo, style: TextStyle(color: AppTheme.textColor)),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildSpecialEventCard() {
+  Widget _buildSpecialEventCard(BuildContext context) {
     return Card(
+      color: Theme.of(context).colorScheme.secondary,
       child: Container(
         height: 150,
         decoration: BoxDecoration(
@@ -106,8 +140,9 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMarketplaceCard() {
+  Widget _buildMarketplaceCard(BuildContext context) {
     return Card(
+      color: Theme.of(context).colorScheme.primary,
       child: Container(
         height: 150,
         decoration: BoxDecoration(
