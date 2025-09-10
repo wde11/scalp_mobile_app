@@ -8,10 +8,7 @@ class ProfileScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {},
-          ),
+          IconButton(icon: const Icon(Icons.settings), onPressed: () {}),
         ],
       ),
       body: SingleChildScrollView(
@@ -22,8 +19,9 @@ class ProfileScreen extends StatelessWidget {
               children: [
                 const CircleAvatar(
                   radius: 60,
-                  backgroundImage:
-                      NetworkImage('https://via.placeholder.com/150'),
+                  backgroundImage: NetworkImage(
+                    'https://via.placeholder.com/150',
+                  ),
                 ),
                 Positioned(
                   bottom: 0,
@@ -36,20 +34,27 @@ class ProfileScreen extends StatelessWidget {
                       onPressed: () {},
                     ),
                   ),
-                )
+                ),
               ],
             ),
             const SizedBox(height: 10),
-            const Text('Troy Wendell',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const Text('Online Seller',
-                style: TextStyle(fontSize: 16, color: Colors.grey)),
+            const Text(
+              'Troy Wendell',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const Text(
+              'Online Seller',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
             const SizedBox(height: 30),
             _buildProfileTextField('Your Email', 'xxx@gmail.com', Icons.email),
+            _buildProfileTextField('Phone Number', '+93123135', Icons.phone),
             _buildProfileTextField(
-                'Phone Number', '+93123135', Icons.phone),
-            _buildProfileTextField(
-                'Password', 'xxx@gmail.com', Icons.lock, true),
+              'Password',
+              'xxx@gmail.com',
+              Icons.lock,
+              true,
+            ),
             const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {},
@@ -65,7 +70,11 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildProfileTextField(
-      String label, String value, IconData icon, [bool isPassword = false]) {
+    String label,
+    String value,
+    IconData icon, [
+    bool isPassword = false,
+  ]) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Column(
@@ -78,9 +87,7 @@ class ProfileScreen extends StatelessWidget {
             obscureText: isPassword,
             decoration: InputDecoration(
               prefixIcon: Icon(icon),
-              suffixIcon: isPassword
-                  ? const Icon(Icons.visibility_off)
-                  : null,
+              suffixIcon: isPassword ? const Icon(Icons.visibility_off) : null,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8.0),
               ),
@@ -91,4 +98,3 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 }
-

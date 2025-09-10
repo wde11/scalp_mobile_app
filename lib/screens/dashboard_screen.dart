@@ -9,14 +9,8 @@ class DashboardScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Dashboard'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () {},
-          ),
+          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
+          IconButton(icon: const Icon(Icons.person), onPressed: () {}),
         ],
       ),
       body: ListView(
@@ -25,7 +19,11 @@ class DashboardScreen extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _buildStatCard('Items Bought', '10', 'Updated 2 hrs ago'),
+                child: _buildStatCard(
+                  'Items Bought',
+                  '10',
+                  'Updated 2 hrs ago',
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -51,9 +49,10 @@ class DashboardScreen extends StatelessWidget {
           children: [
             Text(title, style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 8),
-            Text(value,
-                style:
-                    const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             Text(updateInfo, style: const TextStyle(color: Colors.grey)),
           ],
@@ -70,7 +69,8 @@ class DashboardScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           image: const DecorationImage(
             image: NetworkImage(
-                'https://via.placeholder.com/400x150'), // Placeholder
+              'https://via.placeholder.com/400x150',
+            ), // Placeholder
             fit: BoxFit.cover,
           ),
         ),
@@ -80,16 +80,25 @@ class DashboardScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Text('Special Event',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
-              Text('10:32:10',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold)),
-              Text('Treasure Hunt in Downtown, starting soon!',
-                  style: TextStyle(color: Colors.white)),
+              Text(
+                'Special Event',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                '10:32:10',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Treasure Hunt in Downtown, starting soon!',
+                style: TextStyle(color: Colors.white),
+              ),
             ],
           ),
         ),
@@ -105,7 +114,8 @@ class DashboardScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           image: const DecorationImage(
             image: NetworkImage(
-                'https://via.placeholder.com/400x150'), // Placeholder
+              'https://via.placeholder.com/400x150',
+            ), // Placeholder
             fit: BoxFit.cover,
           ),
         ),
@@ -115,16 +125,25 @@ class DashboardScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('Check out the Marketplace!',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
-              Text('Scalp Parts Now!',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold)),
-              Text('Click on the Shopping Bag Icon to access the marketplace.',
-                  style: TextStyle(color: Colors.white)),
+              Text(
+                'Check out the Marketplace!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Scalp Parts Now!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Click on the Shopping Bag Icon to access the marketplace.',
+                style: TextStyle(color: Colors.white),
+              ),
             ],
           ),
         ),
@@ -132,4 +151,3 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 }
-

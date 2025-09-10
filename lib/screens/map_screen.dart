@@ -11,9 +11,7 @@ class MapScreen extends StatelessWidget {
           // Placeholder for the map
           Container(
             color: Colors.grey[300],
-            child: const Center(
-              child: Text('Map Placeholder'),
-            ),
+            child: const Center(child: Text('Map Placeholder')),
           ),
           Positioned(
             top: 40,
@@ -26,7 +24,9 @@ class MapScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildLocationRow(
-                        'Current location', 'Father Selga, Bangkerohan, Davao City'),
+                      'Current location',
+                      'Father Selga, Bangkerohan, Davao City',
+                    ),
                     const Divider(),
                     _buildLocationRow('Destination', 'Malvar St, Davao City'),
                   ],
@@ -45,16 +45,19 @@ class MapScreen extends StatelessWidget {
                   children: [
                     const CircleAvatar(
                       radius: 30,
-                      backgroundImage:
-                          NetworkImage('https://via.placeholder.com/150'),
+                      backgroundImage: NetworkImage(
+                        'https://via.placeholder.com/150',
+                      ),
                     ),
                     const SizedBox(width: 16),
                     const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('JP Aurelio',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text(
+                            'JP Aurelio',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
                           Text('MH65DT8964'),
                           Text('AOC Monitor 24\''),
                         ],
@@ -65,8 +68,10 @@ class MapScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         const Text('Proposed Price: ₱2500'),
-                        const Text('Selling Price: ₱6000',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Text(
+                          'Selling Price: ₱6000',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         Container(
                           width: 80,
                           height: 80,
@@ -74,18 +79,19 @@ class MapScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                             image: const DecorationImage(
                               image: NetworkImage(
-                                  'https://via.placeholder.com/150'),
+                                'https://via.placeholder.com/150',
+                              ),
                               fit: BoxFit.cover,
                             ),
                           ),
                         ),
                       ],
-                    )
+                    ),
                   ],
                 ),
               ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -94,20 +100,20 @@ class MapScreen extends StatelessWidget {
   Widget _buildLocationRow(String title, String location) {
     return Row(
       children: [
-        Icon(Icons.circle,
-            color: title == 'Current location' ? Colors.blue : Colors.grey,
-            size: 16),
+        Icon(
+          Icons.circle,
+          color: title == 'Current location' ? Colors.blue : Colors.grey,
+          size: 16,
+        ),
         const SizedBox(width: 16),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title, style: const TextStyle(color: Colors.grey)),
-            Text(location,
-                style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(location, style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
-        )
+        ),
       ],
     );
   }
 }
-

@@ -9,14 +9,8 @@ class ListingScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Listing'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () {},
-          ),
+          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
+          IconButton(icon: const Icon(Icons.person), onPressed: () {}),
         ],
       ),
       body: Padding(
@@ -27,10 +21,11 @@ class ListingScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Recent',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                TextButton(onPressed: () {}, child: const Text('Filter'))
+                const Text(
+                  'Recent',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                TextButton(onPressed: () {}, child: const Text('Filter')),
               ],
             ),
             Expanded(
@@ -39,11 +34,14 @@ class ListingScreen extends StatelessWidget {
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
                 children: [
-                  _buildListItem(
-                      'AOC Monitor 24\'', 'Gaming Monitor', '₱6000'),
+                  _buildListItem('AOC Monitor 24\'', 'Gaming Monitor', '₱6000'),
                   _buildListItem('Nec Versapro', 'Laptop', '₱4000'),
                   _buildListItem('RX 570 4 GB', 'Graphics Card', '₱3500'),
-                  _buildListItem('ROG Strix Keyboard', 'Gaming Keyboard', '₱2000'),
+                  _buildListItem(
+                    'ROG Strix Keyboard',
+                    'Gaming Keyboard',
+                    '₱2000',
+                  ),
                 ],
               ),
             ),
@@ -66,11 +64,13 @@ class ListingScreen extends StatelessWidget {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(4)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(4),
+                ),
                 image: const DecorationImage(
                   image: NetworkImage(
-                      'https://via.placeholder.com/150'), // Placeholder
+                    'https://via.placeholder.com/150',
+                  ), // Placeholder
                   fit: BoxFit.cover,
                 ),
               ),
@@ -81,27 +81,29 @@ class ListingScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
                 Text(category, style: const TextStyle(color: Colors.grey)),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(price,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, color: Colors.blue)),
+                    Text(
+                      price,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.add_circle),
                       onPressed: () {},
-                    )
+                    ),
                   ],
-                )
+                ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );
   }
 }
-

@@ -6,9 +6,7 @@ class ChatScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chat'),
-      ),
+      appBar: AppBar(title: const Text('Chat')),
       body: Column(
         children: [
           Padding(
@@ -29,12 +27,36 @@ class ChatScreen extends StatelessWidget {
           Expanded(
             child: ListView(
               children: [
-                _buildChatListItem('JP Aurelio', 'Hello, are you interested?', '30 min'),
-                _buildChatListItem('Renz Pastrana', 'Are you ready for today\'s part..', '12 mar'),
-                _buildChatListItem('LO UIS', 'I\'m sending you a parcel rece..', '08 Feb'),
-                _buildChatListItem('Ken Andrei Usa', 'Hope you\'re doing well today..', '02 Feb'),
-                _buildChatListItem('Kingphillip Fernando', 'Let\'s get back to the work, You..', '25 Jan'),
-                _buildChatListItem('Bobby Malaga Jr.', 'Listen Troy, i have a problem..', '18 Jan'),
+                _buildChatListItem(
+                  'JP Aurelio',
+                  'Hello, are you interested?',
+                  '30 min',
+                ),
+                _buildChatListItem(
+                  'Renz Pastrana',
+                  'Are you ready for today\'s part..',
+                  '12 mar',
+                ),
+                _buildChatListItem(
+                  'LO UIS',
+                  'I\'m sending you a parcel rece..',
+                  '08 Feb',
+                ),
+                _buildChatListItem(
+                  'Ken Andrei Usa',
+                  'Hope you\'re doing well today..',
+                  '02 Feb',
+                ),
+                _buildChatListItem(
+                  'Kingphillip Fernando',
+                  'Let\'s get back to the work, You..',
+                  '25 Jan',
+                ),
+                _buildChatListItem(
+                  'Bobby Malaga Jr.',
+                  'Listen Troy, i have a problem..',
+                  '18 Jan',
+                ),
               ],
             ),
           ),
@@ -55,4 +77,3 @@ class ChatScreen extends StatelessWidget {
     );
   }
 }
-
