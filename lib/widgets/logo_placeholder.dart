@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class LogoPlaceholder extends StatelessWidget {
   final double? height;
-  const LogoPlaceholder({Key? key, this.height}) : super(key: key);
+  const LogoPlaceholder({super.key, this.height});
 
   @override
   Widget build(BuildContext context) {

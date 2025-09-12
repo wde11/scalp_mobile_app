@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -99,10 +99,10 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 );
               },
-              child: const Text('Logout'),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
               ),
+              child: const Text('Logout'),
             ),
           ],
         ),

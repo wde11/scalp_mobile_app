@@ -6,7 +6,7 @@ import 'package:scalp_mobile_app/screens/map_screen.dart';
 import 'package:scalp_mobile_app/screens/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   _HomeScreenState createState() => _HomeScreenState();

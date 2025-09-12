@@ -4,7 +4,7 @@ import 'package:scalp_mobile_app/screens/signup_screen.dart';
 import '../widgets/logo_placeholder.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   _LoginScreenState createState() => _LoginScreenState();
