@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:scalp_mobile_app/screens/login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({Key? key}) : super(key: key);
+  const SignupScreen({super.key});
 
   @override
   _SignupScreenState createState() => _SignupScreenState();
@@ -129,11 +129,13 @@ class _SignupScreenState extends State<SignupScreen> {
                       firstDate: DateTime(1900),
                       lastDate: DateTime.now(),
                     );
-                    setState(() {
-                      _birthDateController.text =
-                          "${pickedDate.day}/${pickedDate.month}/${pickedDate.year}";
-                    });
-                                    },
+                    if (pickedDate != null) {
+                      setState(() {
+                        _birthDateController.text =
+                            "${pickedDate.day}/${pickedDate.month}/${pickedDate.year}";
+                      });
+                    }
+                  },
                 ),
                 const SizedBox(height: 16.0),
                 TextFormField(
