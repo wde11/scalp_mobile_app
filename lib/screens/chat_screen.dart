@@ -28,32 +28,32 @@ class ChatScreen extends StatelessWidget {
             child: ListView(
               children: [
                 _buildChatListItem(
-                  'JP Aurelio',
+                  'John Doe',
                   'Hello, are you interested?',
                   '30 min',
                 ),
                 _buildChatListItem(
-                  'Renz Pastrana',
+                  'Jane Smith',
                   'Are you ready for today\'s part..',
                   '12 mar',
                 ),
                 _buildChatListItem(
-                  'LO UIS',
+                  'Peter Jones',
                   'I\'m sending you a parcel rece..',
                   '08 Feb',
                 ),
                 _buildChatListItem(
-                  'Ken Andrei Usa',
+                  'Mary Williams',
                   'Hope you\'re doing well today..',
                   '02 Feb',
                 ),
                 _buildChatListItem(
-                  'Kingphillip Fernando',
+                  'David Brown',
                   'Let\'s get back to the work, You..',
                   '25 Jan',
                 ),
                 _buildChatListItem(
-                  'Bobby Malaga Jr.',
+                  'Susan Davis',
                   'Listen Troy, i have a problem..',
                   '18 Jan',
                 ),
