@@ -129,13 +129,11 @@ class _SignupScreenState extends State<SignupScreen> {
                       firstDate: DateTime(1900),
                       lastDate: DateTime.now(),
                     );
-                    if (pickedDate != null) {
-                      setState(() {
-                        _birthDateController.text =
-                            "${pickedDate.day}/${pickedDate.month}/${pickedDate.year}";
-                      });
-                    }
-                  },
+                    setState(() {
+                      _birthDateController.text =
+                          "${pickedDate.day}/${pickedDate.month}/${pickedDate.year}";
+                    });
+                                    },
                 ),
                 const SizedBox(height: 16.0),
                 TextFormField(
