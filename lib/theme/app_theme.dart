@@ -21,7 +21,7 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         titleTextStyle: GoogleFonts.inter(
-          color: const Color.fromRGBO(1, 93, 188, 1),
+          color: Colors.black,
           fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
