@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   static const Color primaryColor = Color(0xFF015DBC);
-  static const Color secondaryColor = Color(0xFF015DBC);
+  static const Color secondaryColor = Color.fromRGBO(1, 93, 188, 1);
   static const Color accentColor = Color.fromARGB(255, 255, 255, 255);
   static const Color backgroundColor = Color.fromARGB(255, 255, 255, 255);
   static const Color textColor = Color.fromARGB(255, 0, 0, 0);
@@ -18,9 +18,10 @@ class AppTheme {
         tertiary: accentColor,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: primaryColor,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         titleTextStyle: GoogleFonts.inter(
-          color: Colors.white,
+          color: Colors.black,
           fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
