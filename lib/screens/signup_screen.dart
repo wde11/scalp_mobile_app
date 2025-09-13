@@ -58,17 +58,17 @@ class _SignupScreenState extends State<SignupScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                const SizedBox(height: 24.0),
+                const SizedBox(height: 32.0),
                 Text(
                   'Register',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 8.0),
+                const SizedBox(height: 16.0),
                 Text(
                   'Create an account to continue!',
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
-                const SizedBox(height: 24.0),
+                const SizedBox(height: 32.0),
                 TextFormField(
                   controller: _fullNameController,
                   decoration: InputDecoration(
@@ -87,7 +87,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16.0),
+                const SizedBox(height: 24.0),
                 TextFormField(
                   controller: _lastNameController,
                   decoration: InputDecoration(
@@ -106,7 +106,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16.0),
+                const SizedBox(height: 24.0),
                 TextFormField(
                   controller: _emailController,
                   decoration: InputDecoration(
@@ -128,7 +128,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16.0),
+                const SizedBox(height: 24.0),
                 TextFormField(
                   controller: _birthDateController,
                   decoration: InputDecoration(
@@ -157,7 +157,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     }
                   },
                 ),
-                const SizedBox(height: 16.0),
+                const SizedBox(height: 24.0),
                 TextFormField(
                   controller: _phoneNumberController,
                   decoration: InputDecoration(
@@ -186,7 +186,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16.0),
+                const SizedBox(height: 24.0),
                 TextFormField(
                   controller: _passwordController,
                   obscureText: !_isPasswordVisible,
@@ -218,7 +218,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 24.0),
+                const SizedBox(height: 32.0),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _registerUser,
                   style: ElevatedButton.styleFrom(
@@ -233,7 +233,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         )
                       : const Text('Register', style: TextStyle(fontSize: 16)),
                 ),
-                const SizedBox(height: 24.0),
+                const SizedBox(height: 32.0),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
