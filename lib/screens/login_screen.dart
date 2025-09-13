@@ -58,19 +58,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
                       const LogoPlaceholder(height: 120),
-                      const SizedBox(height: 48.0),
+                      const SizedBox(height: 64.0),
                       Text(
                         'Sign in to your Account',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                       ),
-                      const SizedBox(height: 8.0),
+                      const SizedBox(height: 16.0),
                       Text(
                         'Enter your email and password to log in',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                       ),
-                      const SizedBox(height: 24.0),
+                      const SizedBox(height: 32.0),
                       TextFormField(
                         controller: _emailController,
                         decoration: InputDecoration(
@@ -92,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16.0),
+                      const SizedBox(height: 24.0),
                       TextFormField(
                         controller: _passwordController,
                         obscureText: !_isPasswordVisible,
@@ -124,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16.0),
+                      const SizedBox(height: 24.0),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -149,7 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24.0),
+                      const SizedBox(height: 32.0),
                       ElevatedButton(
                         onPressed: _isLoading ? null : _login, // Disable button when loading
                         style: ElevatedButton.styleFrom(
@@ -164,7 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               )
                             : const Text('Log In', style: TextStyle(fontSize: 16)),
                       ),
-                      const SizedBox(height: 24.0),
+                      const SizedBox(height: 32.0),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [

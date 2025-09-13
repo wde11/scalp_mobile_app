@@ -21,14 +21,14 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         titleTextStyle: GoogleFonts.inter(
-          color: Colors.black,
-          fontSize: 20,
+          color: const Color.fromRGBO(1, 93, 188, 1),
+          fontSize: 25,
           fontWeight: FontWeight.bold,
         ),
       ),
       textTheme: GoogleFonts.interTextTheme().apply(
-        bodyColor: textColor,
-        displayColor: textColor,
+        bodyColor: const Color.fromRGBO(0, 0, 0, 1),
+        displayColor: const Color.fromRGBO(0, 0, 0, 1),
       ),
       cardTheme: CardThemeData(
         elevation: 4,
