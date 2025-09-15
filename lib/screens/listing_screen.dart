@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class ListingScreen extends StatelessWidget {
   const ListingScreen({super.key});
@@ -70,7 +71,7 @@ class ListingScreen extends StatelessWidget {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => context.pop(),
                   child: const Text('Close'),
                 ),
               ],

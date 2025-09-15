@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -18,7 +19,7 @@ class ProfileScreen extends StatelessWidget {
                   content: const Text('Settings options would be here.'),
                   actions: [
                     TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: () => context.pop(),
                       child: const Text('Close'),
                     ),
                   ],
@@ -82,13 +83,13 @@ class ProfileScreen extends StatelessWidget {
                     content: const Text('Are you sure you want to logout?'),
                     actions: [
                       TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: () => context.pop(),
                         child: const Text('Cancel'),
                       ),
                       TextButton(
                         onPressed: () {
                           // Perform logout action
-                          Navigator.of(context).pop();
+                          context.go('/login');
                         },
                         child: const Text('Logout'),
                       ),

@@ -1,38 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:scalp_mobile_app/screens/chat_screen.dart';
-import 'package:scalp_mobile_app/screens/dashboard_screen.dart';
-import 'package:scalp_mobile_app/screens/listing_screen.dart';
-import 'package:scalp_mobile_app/screens/map_screen.dart';
-import 'package:scalp_mobile_app/screens/profile_screen.dart';
+import 'package:go_router/go_router.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class HomeScreen extends StatelessWidget {
+  final StatefulNavigationShell navigationShell;
 
-  @override
-  _HomeScreenState createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
-
-  static final List<Widget> _widgetOptions = <Widget>[
-    DashboardScreen(),
-    ListingScreen(),
-    MapScreen(),
-    ChatScreen(),
-    ProfileScreen(),
-  ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
+  const HomeScreen({super.key, required this.navigationShell});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(child: _widgetOptions.elementAt(_selectedIndex)),
+      body: navigationShell,
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
@@ -44,10 +21,10 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chat'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
-        currentIndex: _selectedIndex,
+        currentIndex: navigationShell.currentIndex,
         selectedItemColor: Colors.blue,
         unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
+        onTap: (index) => navigationShell.goBranch(index),
       ),
     );
   }

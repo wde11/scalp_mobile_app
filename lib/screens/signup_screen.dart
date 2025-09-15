@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:scalp_mobile_app/screens/login_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -31,10 +31,7 @@ class _SignupScreenState extends State<SignupScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Registration Successful')));
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
+      context.go('/login');
     }
   }
 
@@ -47,7 +44,7 @@ class _SignupScreenState extends State<SignupScreen> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => context.pop(),
         ),
       ),
       body: SafeArea(
@@ -229,7 +226,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   child: _isLoading
                       ? const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         )
                       : const Text('Register', style: TextStyle(fontSize: 16)),
                 ),
@@ -240,12 +239,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     const Text("Already have an account?"),
                     TextButton(
                       onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LoginScreen(),
-                          ),
-                        );
+                        context.go('/login');
                       },
                       child: const Text('Log in'),
                     ),
