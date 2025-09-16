@@ -65,8 +65,8 @@ class ProfileScreen extends StatelessWidget {
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 30),
-            _buildProfileInfoItem('Username', '', Icons.person),
-            _buildProfileInfoItem('Phone', '', Icons.phone),
+            _buildProfileInfoItem('Username', 'john_doe', Icons.person),
+            _buildProfileInfoItem('Phone', '+1 234 567 890', Icons.phone),
             _buildProfileInfoItem('Password', '**********', Icons.lock),
             _buildProfileInfoItem(
               'Member Since',
