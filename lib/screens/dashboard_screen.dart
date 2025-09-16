@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:scalp_mobile_app/theme/app_theme.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -62,7 +63,7 @@ class DashboardScreen extends StatelessWidget {
             content: Text('Detailed information about $title.'),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => context.pop(),
                 child: const Text('Close'),
               ),
             ],
@@ -109,7 +110,7 @@ class DashboardScreen extends StatelessWidget {
           ),
         ),
         child: const Padding(
-          padding: EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.end,
@@ -155,7 +156,7 @@ class DashboardScreen extends StatelessWidget {
           ),
         ),
         child: const Padding(
-          padding: EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,

@@ -1,6 +1,5 @@
-import 'package:scalp_mobile_app/screens/home_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:scalp_mobile_app/screens/signup_screen.dart';
+import 'package:go_router/go_router.dart';
 import '../widgets/logo_placeholder.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -32,12 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       // Navigate to the home screen
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const HomeScreen(),
-        ),
-      );
+      context.go('/');
     }
   }
 
@@ -62,7 +56,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         'Sign in to your Account',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 16.0),
                       Text(
@@ -151,7 +148,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 32.0),
                       ElevatedButton(
-                        onPressed: _isLoading ? null : _login, // Disable button when loading
+                        onPressed: _isLoading
+                            ? null
+                            : _login, // Disable button when loading
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16.0),
                           shape: RoundedRectangleBorder(
@@ -160,9 +159,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         child: _isLoading
                             ? const CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               )
-                            : const Text('Log In', style: TextStyle(fontSize: 16)),
+                            : const Text(
+                                'Log In',
+                                style: TextStyle(fontSize: 16),
+                              ),
                       ),
                       const SizedBox(height: 32.0),
                       Row(
@@ -171,12 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const Text("Don't have an account?"),
                           TextButton(
                             onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const SignupScreen(),
-                                ),
-                              );
+                              context.push('/signup');
                             },
                             child: const Text('Sign Up'),
                           ),
@@ -188,7 +187,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-          
         ],
       ),
     );

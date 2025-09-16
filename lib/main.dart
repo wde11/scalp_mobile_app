@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:scalp_mobile_app/screens/login_screen.dart';
+import 'package:scalp_mobile_app/router/app_router.dart';
 import 'package:scalp_mobile_app/theme/app_theme.dart';
 
 void main() {
@@ -11,11 +11,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
+      routerConfig: AppRouter.router,
       debugShowCheckedModeBanner: false,
       title: 'Scalp Mobile App',
       theme: AppTheme.theme,
-      home: const LoginScreen(),
     );
   }
 }
