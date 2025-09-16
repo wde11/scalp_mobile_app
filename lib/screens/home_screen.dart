@@ -1,16 +1,37 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:scalp_mobile_app/screens/chat_screen.dart';
+import 'package:scalp_mobile_app/screens/dashboard_screen.dart';
+import 'package:scalp_mobile_app/screens/listing_screen.dart';
+import 'package:scalp_mobile_app/screens/map_screen.dart';
+import 'package:scalp_mobile_app/screens/profile_screen.dart';
 
-class HomeScreen extends StatelessWidget {
-  final StatefulNavigationShell navigationShell;
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
-  const HomeScreen({super.key, required this.navigationShell});
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0;
+
+  final List<Widget> _screens = [
+    const DashboardScreen(),
+    const ListingScreen(),
+    const MapScreen(),
+    const ChatScreen(),
+    const ProfileScreen(),
+  ];
+
+  final PageStorageBucket _bucket = PageStorageBucket();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: ValueKey(navigationShell.currentIndex),
-      body: navigationShell,
+      body: PageStorage(
+        bucket: _bucket,
+        child: _screens[_selectedIndex],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
@@ -22,10 +43,14 @@ class HomeScreen extends StatelessWidget {
           BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chat'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
-        currentIndex: navigationShell.currentIndex,
+        currentIndex: _selectedIndex,
         selectedItemColor: Colors.blue,
         unselectedItemColor: Colors.grey,
-        onTap: (index) => navigationShell.goBranch(index),
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
       ),
     );
   }

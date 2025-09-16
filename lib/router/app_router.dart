@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:scalp_mobile_app/router/navigator_keys.dart';
 import 'package:scalp_mobile_app/screens/chat_screen.dart';
 import 'package:scalp_mobile_app/screens/dashboard_screen.dart';
 import 'package:scalp_mobile_app/screens/home_screen.dart';
@@ -13,75 +12,38 @@ import 'package:scalp_mobile_app/screens/signup_screen.dart';
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/login',
-    navigatorKey: shellNavigatorKey,
     routes: [
       GoRoute(
         path: '/',
-        redirect: (context, state) => '/dashboard',
-      ),
-      StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) {
-          return HomeScreen(navigationShell: navigationShell);
-        },
-        branches: [
-          StatefulShellBranch(
-            navigatorKey: dashboardNavigatorKey,
-            routes: [
-              GoRoute(
-                path: '/dashboard',
-                builder: (context, state) => const DashboardScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            navigatorKey: listingNavigatorKey,
-            routes: [
-              GoRoute(
-                path: '/listing',
-                builder: (context, state) => const ListingScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            navigatorKey: mapNavigatorKey,
-            routes: [
-              GoRoute(
-                path: '/map',
-                builder: (context, state) => const MapScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            navigatorKey: chatNavigatorKey,
-            routes: [
-              GoRoute(
-                path: '/chat',
-                builder: (context, state) => const ChatScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            navigatorKey: profileNavigatorKey,
-            routes: [
-              GoRoute(
-                path: '/profile',
-                builder: (context, state) => const ProfileScreen(),
-              ),
-            ],
-          ),
-        ],
+        builder: (context, state) => const HomeScreen(),
       ),
       GoRoute(
         path: '/login',
-        builder: (BuildContext context, GoRouterState state) {
-          return const LoginScreen();
-        },
+        builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
         path: '/signup',
-        builder: (BuildContext context, GoRouterState state) {
-          return const SignupScreen();
-        },
+        builder: (context, state) => const SignupScreen(),
+      ),
+      GoRoute(
+        path: '/dashboard',
+        builder: (context, state) => const DashboardScreen(),
+      ),
+      GoRoute(
+        path: '/listing',
+        builder: (context, state) => const ListingScreen(),
+      ),
+      GoRoute(
+        path: '/map',
+        builder: (context, state) => const MapScreen(),
+      ),
+      GoRoute(
+        path: '/chat',
+        builder: (context, state) => const ChatScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
       ),
     ],
   );

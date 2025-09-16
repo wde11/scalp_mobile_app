@@ -31,7 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       // Navigate to the home screen
-      context.go('/dashboard');
+      context.go('/');
     }
   }
 
