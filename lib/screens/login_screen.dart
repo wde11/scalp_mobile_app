@@ -168,6 +168,36 @@ class _LoginScreenState extends State<LoginScreen> {
                                 style: TextStyle(fontSize: 16),
                               ),
                       ),
+                      const SizedBox(height: 24.0),
+                      Row(
+                        children: <Widget>[
+                          const Expanded(child: Divider()),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: Text(
+                              "Or continue with",
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          ),
+                          const Expanded(child: Divider()),
+                        ],
+                      ),
+                      const SizedBox(height: 24.0),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          // TODO: Implement Google Sign-In
+                        },
+                        icon: Image.asset('assets/images/google_logo.png', height: 24.0), // Make sure to add google_logo.png in assets
+                        label: const Text('Sign in with Google'),
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.black, backgroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12.0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                            side: BorderSide(color: Colors.grey[300]!),
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 32.0),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
