@@ -40,19 +40,22 @@ class ListingScreen extends StatelessWidget {
                     'AOC Monitor 24\'',
                     'Gaming Monitor',
                     '₱6000',
+                    'assets/images/monitor.jpeg'
                   ),
-                  _buildListItem(context, 'Nec Versapro', 'Laptop', '₱4000'),
+                  _buildListItem(context, 'Nec Versapro', 'Laptop', '₱4000', 'assets/images/laptop.jpeg'),
                   _buildListItem(
                     context,
                     'RX 570 4 GB',
                     'Graphics Card',
                     '₱3500',
+                    'assets/images/graphics_card.png'
                   ),
                   _buildListItem(
                     context,
                     'ROG Strix Keyboard',
                     'Gaming Keyboard',
                     '₱2000',
+                    'assets/images/keyboard.jpg'
                   ),
                 ],
               ),
@@ -89,6 +92,7 @@ class ListingScreen extends StatelessWidget {
     String name,
     String category,
     String price,
+    String imagePath,
   ) {
     return Card(
       child: Column(
@@ -100,10 +104,8 @@ class ListingScreen extends StatelessWidget {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(4),
                 ),
-                image: const DecorationImage(
-                  image: NetworkImage(
-                    'https://via.placeholder.com/150',
-                  ), // Placeholder
+                image: DecorationImage(
+                  image: AssetImage(imagePath.replaceFirst('assets/', '')),
                   fit: BoxFit.cover,
                 ),
               ),

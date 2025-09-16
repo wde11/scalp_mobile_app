@@ -38,7 +38,7 @@ class ProfileScreen extends StatelessWidget {
                 const CircleAvatar(
                   radius: 60,
                   backgroundImage: NetworkImage(
-                    'https://via.placeholder.com/150',
+                    'https://picsum.photos/seed/profile-pic/200/200',
                   ),
                 ),
                 Positioned(

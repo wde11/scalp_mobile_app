@@ -31,31 +31,37 @@ class ChatScreen extends StatelessWidget {
                   'John Doe',
                   'Hello, are you interested?',
                   '30 min',
+                  'https://picsum.photos/seed/john-doe/200/200'
                 ),
                 _buildChatListItem(
                   'Jane Smith',
                   'Are you ready for today\'s part..',
                   '12 mar',
+                  'https://picsum.photos/seed/jane-smith/200/200'
                 ),
                 _buildChatListItem(
                   'Peter Jones',
                   'I\'m sending you a parcel rece..',
                   '08 Feb',
+                  'https://picsum.photos/seed/peter-jones/200/200'
                 ),
                 _buildChatListItem(
                   'Mary Williams',
                   'Hope you\'re doing well today..',
                   '02 Feb',
+                  'https://picsum.photos/seed/mary-williams/200/200'
                 ),
                 _buildChatListItem(
                   'David Brown',
                   'Let\'s get back to the work, You..',
                   '25 Jan',
+                  'https://picsum.photos/seed/david-brown/200/200'
                 ),
                 _buildChatListItem(
                   'Susan Davis',
                   'Listen Troy, i have a problem..',
                   '18 Jan',
+                  'https://picsum.photos/seed/susan-davis/200/200'
                 ),
               ],
             ),
@@ -65,10 +71,10 @@ class ChatScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildChatListItem(String name, String message, String time) {
+  Widget _buildChatListItem(String name, String message, String time, String imageUrl) {
     return ListTile(
-      leading: const CircleAvatar(
-        backgroundImage: NetworkImage('https://via.placeholder.com/150'),
+      leading: CircleAvatar(
+        backgroundImage: NetworkImage(imageUrl),
       ),
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
       subtitle: Text(message),
