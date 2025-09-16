@@ -69,7 +69,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 TextFormField(
                   controller: _fullNameController,
                   decoration: InputDecoration(
-                    labelText: 'Full Name',
+                    labelText: 'First Name',
                     filled: true,
                     fillColor: Colors.white,
                     border: OutlineInputBorder(

@@ -38,7 +38,7 @@ class ProfileScreen extends StatelessWidget {
                 const CircleAvatar(
                   radius: 60,
                   backgroundImage: NetworkImage(
-                    'https://via.placeholder.com/150',
+                    'https://picsum.photos/seed/profile-pic/200/200',
                   ),
                 ),
                 Positioned(
@@ -65,8 +65,8 @@ class ProfileScreen extends StatelessWidget {
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 30),
-            _buildProfileInfoItem('Username', '', Icons.person),
-            _buildProfileInfoItem('Phone', '', Icons.phone),
+            _buildProfileInfoItem('Username', 'john_doe', Icons.person),
+            _buildProfileInfoItem('Phone', '+1 234 567 890', Icons.phone),
             _buildProfileInfoItem('Password', '**********', Icons.lock),
             _buildProfileInfoItem(
               'Member Since',
@@ -74,33 +74,36 @@ class ProfileScreen extends StatelessWidget {
               Icons.calendar_today,
             ),
             const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Logout'),
-                    content: const Text('Are you sure you want to logout?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => context.pop(),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          // Perform logout action
-                          context.go('/login');
-                        },
-                        child: const Text('Logout'),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: ElevatedButton(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Logout'),
+                      content: const Text('Are you sure you want to logout?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => context.pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            // Perform logout action
+                            context.go('/login');
+                          },
+                          child: const Text('Logout'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+                child: const Text('Logout'),
               ),
-              child: const Text('Logout'),
             ),
           ],
         ),
