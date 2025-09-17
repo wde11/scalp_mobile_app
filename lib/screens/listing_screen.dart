@@ -67,18 +67,7 @@ class ListingScreen extends StatelessWidget {
         onPressed: () {
           showDialog(
             context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Create Listing'),
-              content: const Text(
-                'This would open a form to create a new listing.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => context.pop(),
-                  child: const Text('Close'),
-                ),
-              ],
-            ),
+            builder: (context) => const _CreateListingModal(),
           );
         },
         label: const Text('Create Listing'),
@@ -146,6 +135,131 @@ class ListingScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CreateListingModal extends StatefulWidget {
+  const _CreateListingModal({super.key});
+
+  @override
+  State<_CreateListingModal> createState() => _CreateListingModalState();
+}
+
+class _CreateListingModalState extends State<_CreateListingModal> {
+  final _categories = ['Electronics', 'Furniture', 'Clothing', 'Other'];
+  String? _selectedCategory;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: const Text(
+        'Create Listing',
+        style: TextStyle(
+          color: Colors.blue,
+          fontWeight: FontWeight.bold,
+          fontSize: 24,
+        ),
+      ),
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.8,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Item Name',
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: 'Category',
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                value: _selectedCategory,
+                items: _categories.map((category) {
+                  return DropdownMenuItem(
+                    value: category,
+                    child: Text(category),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedCategory = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Description',
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                maxLines: 4,
+              ),
+              const SizedBox(height: 16),
+              Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.grey,
+                    width: 2,
+                    style: BorderStyle.solid,
+                  ),
+                ),
+                child: const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.cloud_upload_outlined, color: Colors.grey, size: 40),
+                      SizedBox(height: 8),
+                      Text('Insert Images', style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => context.pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onPressed: () {},
+          child: const Text('Create'),
+        ),
+      ],
     );
   }
 }
