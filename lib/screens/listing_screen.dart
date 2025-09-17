@@ -79,8 +79,41 @@ class _ListingScreenState extends State<ListingScreen> {
       appBar: AppBar(
         title: const Text('Listing'),
         actions: [
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.person), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.search, color: Colors.blue),
+            onPressed: () {
+              showSearch(
+                context: context,
+                delegate: _ListingSearchDelegate(listings: _listings),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.person, color: Colors.blue),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Profile Details'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text('Name: John Doe'),
+                      Text('Email: john.doe@example.com'),
+                      Text('Location: Davao City'),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => context.pop(),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
       ),
       body: Padding(
@@ -186,7 +219,7 @@ class _ListingScreenState extends State<ListingScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.add_shopping_cart),
+                      icon: const Icon(Icons.add_shopping_cart, color: Colors.blue),
                       onPressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -435,6 +468,142 @@ class _CreateListingModalState extends State<_CreateListingModal> {
           child: const Text('Create'),
         ),
       ],
+    );
+  }
+}
+
+class _ListingSearchDelegate extends SearchDelegate<String> {
+  final List<ListingItem> listings;
+
+  _ListingSearchDelegate({required this.listings});
+
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear, color: Colors.blue),
+        onPressed: () {
+          query = '';
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back, color: Colors.blue),
+      onPressed: () {
+        close(context, '');
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    final List<ListingItem> searchResults = listings.where((item) {
+      return item.name.toLowerCase().contains(query.toLowerCase()) ||
+             item.category.toLowerCase().contains(query.toLowerCase()) ||
+             item.description.toLowerCase().contains(query.toLowerCase());
+    }).toList();
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(8.0),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 0.75,
+      ),
+      itemCount: searchResults.length,
+      itemBuilder: (context, index) {
+        final item = searchResults[index];
+        ImageProvider imageProvider;
+        if (item.imageData != null) {
+          imageProvider = MemoryImage(item.imageData!);
+        } else if (item.imagePath != null && item.imagePath!.startsWith('assets/')) {
+          imageProvider = AssetImage(item.imagePath!);
+        } else if (item.imagePath != null && !kIsWeb) {
+          imageProvider = FileImage(File(item.imagePath!));
+        } else {
+          // Fallback for web if imagePath is not an asset and imageData is null
+          imageProvider = const AssetImage('assets/images/scalp_logo_w_v2.png');
+        }
+
+        return Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(4),
+                    ),
+                    image: DecorationImage(
+                      image: imageProvider,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Text(item.category, style: const TextStyle(color: Colors.grey)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(item.price, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                        IconButton(
+                          icon: const Icon(Icons.add_shopping_cart, color: Colors.blue),
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${item.name} added to cart.'),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    final List<ListingItem> suggestionList = query.isEmpty
+        ? []
+        : listings.where((item) {
+            return item.name.toLowerCase().contains(query.toLowerCase()) ||
+                   item.category.toLowerCase().contains(query.toLowerCase()) ||
+                   item.description.toLowerCase().contains(query.toLowerCase());
+          }).toList();
+
+    return ListView.builder(
+      itemCount: suggestionList.length,
+      itemBuilder: (context, index) {
+        final item = suggestionList[index];
+        return ListTile(
+          title: Text(item.name),
+          subtitle: Text(item.category),
+          onTap: () {
+            query = item.name;
+            showResults(context);
+          },
+        );
+      },
     );
   }
 }
