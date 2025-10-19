@@ -38,7 +38,12 @@ dependencies:
   bcrypt: ^1.1.3
   go_router: ^16.2.1
   flutter_map: ^8.2.1
+<<<<<<< Updated upstream
   image_picker: ^1.1.2
+=======
+  firebase_auth: ^6.1.1
+  firebase_core: ^3.24.0
+>>>>>>> Stashed changes
 
 dev_dependencies:
   flutter_test:
