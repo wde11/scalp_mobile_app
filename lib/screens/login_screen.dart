@@ -43,9 +43,9 @@ class _LoginScreenState extends State<LoginScreen> {
           message = 'An error occurred during login.';
         }
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(message)));
         }
       } catch (e) {
         if (mounted) {
@@ -201,7 +201,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: <Widget>[
                           const Expanded(child: Divider()),
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8.0,
+                            ),
                             child: Text(
                               "Or continue with",
                               style: TextStyle(color: Colors.grey[600]),
@@ -215,10 +217,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: () {
                           // TODO: Implement Google Sign-In
                         },
-                        icon: Image.asset('assets/images/google_logo.png', height: 24.0), // Make sure to add google_logo.png in assets
+                        icon: Image.asset(
+                          'assets/images/google_logo.png',
+                          height: 24.0,
+                        ), // Make sure to add google_logo.png in assets
                         label: const Text('Sign in with Google'),
                         style: ElevatedButton.styleFrom(
-                          foregroundColor: Colors.black, backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          backgroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12.0),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8.0),
