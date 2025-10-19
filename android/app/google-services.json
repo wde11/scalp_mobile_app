@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "819509773689",
+    "project_id": "scalp-18928",
+    "storage_bucket": "scalp-18928.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:819509773689:android:fc1503e2446c8f99581ba8",
+        "android_client_info": {
+          "package_name": "com.example.scalp_mobile_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD09rYwm9JJ5zHwcrAZYvBcT6H-9gfk_ZI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

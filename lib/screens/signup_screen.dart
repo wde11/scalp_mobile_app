@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -25,13 +26,58 @@ class _SignupScreenState extends State<SignupScreen> {
         _isLoading = true;
       });
 
-      // Simulate a network request
-      await Future.delayed(const Duration(seconds: 2));
+      try {
+        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Registration Successful')));
-      context.go('/login');
+        // Here you could add user details to Firestore or Realtime Database
+        // For example:
+        // User? user = FirebaseAuth.instance.currentUser;
+        // if (user != null) {
+        //   await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        //     'firstName': _fullNameController.text.trim(),
+        //     'lastName': _lastNameController.text.trim(),
+        //     'email': _emailController.text.trim(),
+        //     'birthDate': _birthDateController.text.trim(),
+        //     'phoneNumber': _phoneNumberController.text.trim(),
+        //   });
+        // }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Registration Successful')),
+          );
+          context.go('/login');
+        }
+      } on FirebaseAuthException catch (e) {
+        String message;
+        if (e.code == 'weak-password') {
+          message = 'The password provided is too weak.';
+        } else if (e.code == 'email-already-in-use') {
+          message = 'The account already exists for that email.';
+        } else {
+          message = 'An error occurred during registration.';
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message)),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('An unexpected error occurred.')),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
     }
   }
 

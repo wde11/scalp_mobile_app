@@ -2,43 +2,64 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  static const Color primaryColor = Color(0xFF015DBC);
-  static const Color secondaryColor = Color.fromRGBO(1, 93, 188, 1);
-  static const Color accentColor = Color.fromARGB(255, 255, 255, 255);
-  static const Color backgroundColor = Color.fromARGB(255, 255, 255, 255);
-  static const Color textColor = Color.fromARGB(255, 0, 0, 0);
+  static const Color primaryColor = Color(0xFF2563EB);
+  static const Color secondaryColor = Color(0xFF3B82F6);
+  static const Color accentColor = Color(0xFF60A5FA);
+  static const Color backgroundColor = Color(0xFFF8FAFC);
+  static const Color textColor = Color(0xFF1E293B);
+  static const Color surfaceColor = Color(0xFFFFFFFF);
+  static const Color errorColor = Color(0xFFEF4444);
 
   static ThemeData get theme {
     return ThemeData(
       primaryColor: primaryColor,
       scaffoldBackgroundColor: backgroundColor,
-      colorScheme: const ColorScheme.light(
+      colorScheme: ColorScheme.light(
         primary: primaryColor,
         secondary: secondaryColor,
         tertiary: accentColor,
+        surface: surfaceColor,
+        background: backgroundColor,
+        error: errorColor,
+        onPrimary: Colors.white,
+        onSecondary: Colors.white,
+        onSurface: textColor,
+        onBackground: textColor,
+        onError: Colors.white,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.transparent,
+        backgroundColor: surfaceColor,
         elevation: 0,
+        centerTitle: true,
         titleTextStyle: GoogleFonts.inter(
-          color: const Color.fromRGBO(1, 93, 188, 1),
-          fontSize: 25,
-          fontWeight: FontWeight.bold,
+          color: textColor,
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
         ),
+        iconTheme: IconThemeData(color: primaryColor),
       ),
       textTheme: GoogleFonts.interTextTheme().apply(
-        bodyColor: const Color.fromRGBO(0, 0, 0, 1),
-        displayColor: const Color.fromRGBO(0, 0, 0, 1),
+        bodyColor: textColor,
+        displayColor: textColor,
       ),
       cardTheme: CardThemeData(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        elevation: 2,
+        shadowColor: primaryColor.withOpacity(0.1),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        color: surfaceColor,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color.fromRGBO(1, 93, 188, 1),
+          backgroundColor: primaryColor,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          elevation: 2,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
         ),
       ),
     );
