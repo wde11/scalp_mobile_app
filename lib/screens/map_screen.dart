@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:html' as html;
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -10,29 +11,40 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  final MapController _mapController = MapController();
+  GoogleMapController? _mapController;
+  static const CameraPosition _initialPosition = CameraPosition(
+    target: LatLng(10.3157, 123.8854), // Example: Cebu City
+    zoom: 13.0,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      // Ensure the Google Maps JavaScript API is loaded
+      html.document.getElementsByTagName('script').forEach((element) {
+        if ((element as html.ScriptElement).src.contains('maps.googleapis.com/maps/api/js')) {
+          return;
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          // Full-screen map with a light theme
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: const LatLng(10.3157, 123.8854), // Example: Cebu City
-              initialZoom: 13.0,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all,
-              ),
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                subdomains: const ['a', 'b', 'c'],
-              ),
-            ],
+          // Full-screen Google Map
+          GoogleMap(
+            initialCameraPosition: _initialPosition,
+            onMapCreated: (GoogleMapController controller) {
+              _mapController = controller;
+            },
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapType: MapType.normal,
           ),
 
           // Top Elements: Input fields for location and destination
@@ -112,9 +124,8 @@ class _MapScreenState extends State<MapScreen> {
                   backgroundColor: Colors.white,
                   child: const Icon(Icons.add, color: Colors.black),
                   onPressed: () {
-                    _mapController.move(
-                      _mapController.camera.center,
-                      _mapController.camera.zoom + 1,
+                    _mapController?.animateCamera(
+                      CameraUpdate.zoomIn(),
                     );
                   },
                 ),
@@ -124,9 +135,8 @@ class _MapScreenState extends State<MapScreen> {
                   backgroundColor: Colors.white,
                   child: const Icon(Icons.remove, color: Colors.black),
                   onPressed: () {
-                    _mapController.move(
-                      _mapController.camera.center,
-                      _mapController.camera.zoom - 1,
+                    _mapController?.animateCamera(
+                      CameraUpdate.zoomOut(),
                     );
                   },
                 ),
