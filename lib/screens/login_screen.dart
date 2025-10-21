@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../widgets/logo_placeholder.dart';
@@ -17,6 +18,47 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = false;
   bool _isPasswordVisible = false;
   bool _isLoading = false;
+  
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  Future<void> _signInWithGoogle() async {
+    if (_isLoading) return;
+
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Create a new provider with scopes
+      final googleProvider = GoogleAuthProvider()
+        ..addScope('email')
+        ..addScope('https://www.googleapis.com/auth/userinfo.profile');
+
+      if (kIsWeb) {
+        // For web platform
+        final userCredential = await _auth.signInWithPopup(googleProvider);
+        if (mounted && userCredential.user != null) {
+          context.go('/');
+        }
+      } else {
+        // For mobile platforms
+        await _auth.signInWithRedirect(googleProvider);
+        // Navigation will be handled by Firebase Auth state changes
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to sign in with Google: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   void _login() async {
     if (_formKey.currentState!.validate()) {
@@ -213,19 +255,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         ],
                       ),
                       const SizedBox(height: 24.0),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          // TODO: Implement Google Sign-In
-                        },
-                        icon: Image.asset(
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _signInWithGoogle,
+                        child: Image.asset(
                           'assets/images/google_logo.png',
                           height: 24.0,
                         ), // Make sure to add google_logo.png in assets
-                        label: const Text('Sign in with Google'),
                         style: ElevatedButton.styleFrom(
                           foregroundColor: Colors.black,
                           backgroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12.0),
+                          padding: const EdgeInsets.all(12.0),
+                          minimumSize: Size(48, 48),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8.0),
                             side: BorderSide(color: Colors.grey[300]!),

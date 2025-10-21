@@ -46,6 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '819509773689',
     projectId: 'scalp-18928',
     authDomain: 'scalp-18928.firebaseapp.com',
+    databaseURL: 'https://scalp-18928-default-rtdb.firebaseio.com',
     storageBucket: 'scalp-18928.firebasestorage.app',
     measurementId: 'G-RWL5LVSQVG',
   );
@@ -55,6 +56,7 @@ class DefaultFirebaseOptions {
     appId: '1:819509773689:android:fc1503e2446c8f99581ba8',
     messagingSenderId: '819509773689',
     projectId: 'scalp-18928',
+    databaseURL: 'https://scalp-18928-default-rtdb.firebaseio.com',
     storageBucket: 'scalp-18928.firebasestorage.app',
   );
 
@@ -63,7 +65,9 @@ class DefaultFirebaseOptions {
     appId: '1:819509773689:ios:2785b775ad98cc30581ba8',
     messagingSenderId: '819509773689',
     projectId: 'scalp-18928',
+    databaseURL: 'https://scalp-18928-default-rtdb.firebaseio.com',
     storageBucket: 'scalp-18928.firebasestorage.app',
+    iosClientId: '819509773689-gakpf56brfmhluplv3176qn7bu2q97uf.apps.googleusercontent.com',
     iosBundleId: 'com.example.scalpMobileApp',
   );
 
@@ -72,7 +76,9 @@ class DefaultFirebaseOptions {
     appId: '1:819509773689:ios:2785b775ad98cc30581ba8',
     messagingSenderId: '819509773689',
     projectId: 'scalp-18928',
+    databaseURL: 'https://scalp-18928-default-rtdb.firebaseio.com',
     storageBucket: 'scalp-18928.firebasestorage.app',
+    iosClientId: '819509773689-gakpf56brfmhluplv3176qn7bu2q97uf.apps.googleusercontent.com',
     iosBundleId: 'com.example.scalpMobileApp',
   );
 
@@ -82,7 +88,9 @@ class DefaultFirebaseOptions {
     messagingSenderId: '819509773689',
     projectId: 'scalp-18928',
     authDomain: 'scalp-18928.firebaseapp.com',
+    databaseURL: 'https://scalp-18928-default-rtdb.firebaseio.com',
     storageBucket: 'scalp-18928.firebasestorage.app',
     measurementId: 'G-7GVWMEGSGZ',
   );
+
 }
