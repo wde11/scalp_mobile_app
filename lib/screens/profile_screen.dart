@@ -80,6 +80,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
   }
+  
+  Future<void> _editUsername() async {
+    final usernameController = TextEditingController();
+    final userData = await _getUserData();
+    usernameController.text = userData?['username'] ?? '';
+    
+    if (!mounted) return;
+    
+    final newUsername = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Username'),
+        content: TextField(
+          controller: usernameController,
+          decoration: const InputDecoration(
+            labelText: 'Username',
+            hintText: 'Enter new username',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(usernameController.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    
+    if (newUsername != null && newUsername.isNotEmpty && currentUser != null) {
+      try {
+        await _firestore.collection('users').doc(currentUser!.uid).update({
+          'username': newUsername,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        
+        if (mounted) {
+          setState(() {}); // Refresh the UI
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Username updated successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error updating username: $e')),
+          );
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -147,38 +203,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               children: [
                 const SizedBox(height: 20),
-                Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 60,
-                      backgroundColor: Colors.grey[300],
-                      backgroundImage: currentUser!.photoURL != null
-                          ? NetworkImage(currentUser!.photoURL!)
-                          : null,
-                      child: currentUser!.photoURL == null
-                          ? Text(
-                              displayName[0].toUpperCase(),
-                              style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
-                            )
-                          : null,
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: CircleAvatar(
-                        radius: 20,
-                        backgroundColor: Theme.of(context).primaryColor,
-                        child: IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.white, size: 20),
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Edit profile feature coming soon')),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
+                CircleAvatar(
+                  radius: 60,
+                  backgroundColor: Colors.grey[300],
+                  backgroundImage: currentUser!.photoURL != null
+                      ? NetworkImage(currentUser!.photoURL!)
+                      : null,
+                  child: currentUser!.photoURL == null
+                      ? Text(
+                          displayName[0].toUpperCase(),
+                          style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
+                        )
+                      : null,
                 ),
                 const SizedBox(height: 10),
                 Text(
@@ -210,7 +246,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 const SizedBox(height: 30),
-                _buildProfileInfoItem('Username', username, Icons.person),
+                _buildProfileInfoItem('Username', username, Icons.person, onEdit: _editUsername),
                 _buildProfileInfoItem('Email', email, Icons.email),
                 _buildProfileInfoItem('Phone', phone, Icons.phone),
                 _buildProfileInfoItem(
@@ -246,21 +282,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileInfoItem(String label, String value, IconData icon) {
+  Widget _buildProfileInfoItem(String label, String value, IconData icon, {VoidCallback? onEdit}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
       child: Row(
         children: [
           Icon(icon, color: Colors.grey),
           const SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 5),
-              Text(value, style: const TextStyle(fontSize: 16)),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 5),
+                Text(value, style: const TextStyle(fontSize: 16)),
+              ],
+            ),
           ),
+          if (onEdit != null)
+            IconButton(
+              icon: const Icon(Icons.edit, size: 20),
+              onPressed: onEdit,
+              tooltip: 'Edit $label',
+            ),
         ],
       ),
     );
