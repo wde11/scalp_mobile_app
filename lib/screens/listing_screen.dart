@@ -266,6 +266,7 @@ class _ListingScreenState extends State<ListingScreen> {
                         '₱${data['price']?.toString() ?? '0'}',
                         data['imageUrl'] ?? 'assets/images/placeholder.png',
                         isOwner: _auth.currentUser?.uid == data['userId'],
+                        onTap: () => _showListingDetails(context, listing),
                         onEdit: () => _showEditListingDialog(listing),
                         onDelete: () => _deleteListing(listing.id),
                       );
@@ -297,11 +298,14 @@ class _ListingScreenState extends State<ListingScreen> {
     String price,
     String imagePath, {
     bool isOwner = false,
+    VoidCallback? onTap,
     VoidCallback? onEdit,
     VoidCallback? onDelete,
   }) {
-    return Card(
-      child: Stack(
+    return GestureDetector(
+      onTap: onTap,
+      child: Card(
+        child: Stack(
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -382,6 +386,14 @@ class _ListingScreenState extends State<ListingScreen> {
             ),
         ],
       ),
+      ),
+    );
+  }
+  
+  void _showListingDetails(BuildContext context, QueryDocumentSnapshot listing) {
+    showDialog(
+      context: context,
+      builder: (context) => _ListingDetailsModal(listing: listing),
     );
   }
 }
@@ -652,6 +664,309 @@ class _CreateListingModalState extends State<_CreateListingModal> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Text('Create Listing'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Listing Details Modal
+class _ListingDetailsModal extends StatelessWidget {
+  final QueryDocumentSnapshot listing;
+
+  const _ListingDetailsModal({required this.listing});
+
+  @override
+  Widget build(BuildContext context) {
+    final data = listing.data() as Map<String, dynamic>;
+    final title = data['title'] ?? 'No Title';
+    final category = data['category'] ?? 'No Category';
+    final price = data['price']?.toString() ?? '0';
+    final description = data['description'] ?? 'No description available';
+    final imageUrl = data['imageUrl'] ?? 'assets/images/placeholder.png';
+    final userId = data['userId'];
+    
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth: 600,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header with close button
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Listing Details',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Image
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: imageUrl.startsWith('assets/')
+                            ? Image.asset(
+                                imageUrl.replaceFirst('assets/', ''),
+                                fit: BoxFit.cover,
+                              )
+                            : Image.network(
+                                imageUrl,
+                                fit: BoxFit.cover,
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Container(
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey[300],
+                                    child: const Icon(
+                                      Icons.image_not_supported,
+                                      size: 64,
+                                      color: Colors.grey,
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Title
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Category
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        category,
+                        style: const TextStyle(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Price
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.attach_money,
+                          color: Colors.green,
+                          size: 32,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '₱$price',
+                          style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Description section
+                    const Text(
+                      'Description',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[700],
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Seller information
+                    FutureBuilder<DocumentSnapshot>(
+                      future: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(userId)
+                          .get(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
+                        
+                        if (!snapshot.hasData || !snapshot.data!.exists) {
+                          return const SizedBox.shrink();
+                        }
+                        
+                        final userData = snapshot.data!.data() as Map<String, dynamic>;
+                        final sellerName = userData['name'] ?? 'Unknown Seller';
+                        final sellerEmail = userData['email'] ?? '';
+                        final sellerPhoto = userData['profilePicture'] ?? '';
+                        
+                        return Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Seller Information',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 24,
+                                    backgroundImage: sellerPhoto.isNotEmpty
+                                        ? NetworkImage(sellerPhoto)
+                                        : null,
+                                    child: sellerPhoto.isEmpty
+                                        ? const Icon(Icons.person)
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          sellerName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        if (sellerEmail.isNotEmpty)
+                                          Text(
+                                            sellerEmail,
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            // Bottom action buttons
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        // TODO: Implement contact seller
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Contact seller feature coming soon!'),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      label: const Text('Contact Seller'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        // TODO: Implement add to cart or buy
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('$title added to cart!'),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.shopping_cart),
+                      label: const Text('Add to Cart'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
