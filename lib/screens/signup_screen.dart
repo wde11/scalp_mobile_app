@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, FirebaseAuthException;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -27,23 +28,29 @@ class _SignupScreenState extends State<SignupScreen> {
       });
 
       try {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        // Create user account
+        final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
 
-        // Here you could add user details to Firestore or Realtime Database
-        // For example:
-        // User? user = FirebaseAuth.instance.currentUser;
-        // if (user != null) {
-        //   await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        //     'firstName': _fullNameController.text.trim(),
-        //     'lastName': _lastNameController.text.trim(),
-        //     'email': _emailController.text.trim(),
-        //     'birthDate': _birthDateController.text.trim(),
-        //     'phoneNumber': _phoneNumberController.text.trim(),
-        //   });
-        // }
+        // Save user details to Firestore
+        final user = userCredential.user;
+        if (user != null) {
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+            'firstName': _fullNameController.text.trim(),
+            'lastName': _lastNameController.text.trim(),
+            'name': '${_fullNameController.text.trim()} ${_lastNameController.text.trim()}',
+            'email': _emailController.text.trim(),
+            'birthDate': _birthDateController.text.trim(),
+            'phone': _phoneNumberController.text.trim(),
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+          // Update display name in Firebase Auth
+          await user.updateDisplayName('${_fullNameController.text.trim()} ${_lastNameController.text.trim()}');
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -68,7 +75,7 @@ class _SignupScreenState extends State<SignupScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('An unexpected error occurred.')),
+            SnackBar(content: Text('An unexpected error occurred: $e')),
           );
         }
       } finally {
