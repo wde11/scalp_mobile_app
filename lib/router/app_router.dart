@@ -7,6 +7,8 @@ import 'package:scalp_mobile_app/screens/login_screen.dart';
 import 'package:scalp_mobile_app/screens/map_screen.dart';
 import 'package:scalp_mobile_app/screens/profile_screen.dart';
 import 'package:scalp_mobile_app/screens/signup_screen.dart';
+import 'package:scalp_mobile_app/screens/my_cart_screen.dart';
+import 'package:scalp_mobile_app/screens/my_items_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -43,6 +45,14 @@ class AppRouter {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/my-cart',
+        builder: (context, state) => const MyCartScreen(),
+      ),
+      GoRoute(
+        path: '/my-items',
+        builder: (context, state) => const MyItemsScreen(),
       ),
     ],
   );
