@@ -45,5 +45,13 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Google Maps API Key -->
+	<key>com.google.ios.maps.API_KEY</key>
+	<string>AIzaSyDyqD1EGcOyf4Ypl3Cg3OUdpI70rYMo6QQ</string>
+	<!-- Location Permissions -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need your location to show the map with your current position.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need your location to show the map with your current position.</string>
 </dict>
 </plist>
