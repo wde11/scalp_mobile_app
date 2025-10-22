@@ -191,14 +191,19 @@ class _ChatScreenState extends State<ChatScreen> {
   }
   
   Stream<List<Map<String, dynamic>>> _getUserChatsStream() {
-    if (currentUser == null) return Stream.value([]);
+    if (currentUser == null) {
+      print('DEBUG: No current user logged in');
+      return Stream.value([]);
+    }
+    
+    print('DEBUG: Fetching chats for user: ${currentUser!.uid}');
     
     return _firestore
         .collection('chats')
         .where('participants', arrayContains: currentUser!.uid)
-        .orderBy('lastMessageTime', descending: true)
         .snapshots()
         .asyncMap((snapshot) async {
+      print('DEBUG: Received ${snapshot.docs.length} chat documents');
       List<Map<String, dynamic>> chats = [];
       
       for (var doc in snapshot.docs) {
@@ -237,6 +242,20 @@ class _ChatScreenState extends State<ChatScreen> {
           'lastMessageTime': data['lastMessageTime'],
         });
       }
+      
+      // Sort by lastMessageTime on client side (most recent first)
+      chats.sort((a, b) {
+        final aTime = a['lastMessageTime'] as Timestamp?;
+        final bTime = b['lastMessageTime'] as Timestamp?;
+        
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1; // Put null times at the end
+        if (bTime == null) return -1;
+        
+        return bTime.compareTo(aTime); // Descending order (most recent first)
+      });
+      
+      print('DEBUG: Returning ${chats.length} chats after processing');
       
       return chats;
     });
@@ -425,6 +444,16 @@ class _ChatScreenState extends State<ChatScreen> {
           StreamBuilder<List<Map<String, dynamic>>>(
             stream: _getUserChatsStream(),
             builder: (context, recentSnapshot) {
+              if (recentSnapshot.hasError) {
+                return Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Text(
+                    'Error: ${recentSnapshot.error}',
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                );
+              }
+              
               if (!recentSnapshot.hasData || recentSnapshot.data!.isEmpty) {
                 return const SizedBox.shrink();
               }
@@ -584,6 +613,19 @@ class _ChatScreenState extends State<ChatScreen> {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
+                }
+                
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Text(
+                        'Error loading chats:\n${snapshot.error}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  );
                 }
                 
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
