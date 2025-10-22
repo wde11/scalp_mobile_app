@@ -227,7 +227,30 @@ class _ListingScreenState extends State<ListingScreen> {
                   'Recent',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                TextButton(onPressed: () {}, child: const Text('Filter')),
+                Row(
+                  children: [
+                    ElevatedButton(
+                      onPressed: () {
+                        context.push('/my-cart');
+                      },
+                      child: const Text('My Cart'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        context.push('/my-items');
+                      },
+                      child: const Text('My Items'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        // TODO: Implement filter logic
+                      },
+                      child: const Text('Filter'),
+                    ),
+                  ],
+                ),
               ],
             ),
             Expanded(
@@ -400,7 +423,7 @@ class _ListingScreenState extends State<ListingScreen> {
 }
 
 class _CreateListingModal extends StatefulWidget {
-  const _CreateListingModal({super.key});
+  const _CreateListingModal();
 
   @override
   State<_CreateListingModal> createState() => _CreateListingModalState();
@@ -676,8 +699,74 @@ class _CreateListingModalState extends State<_CreateListingModal> {
 // Listing Details Modal
 class _ListingDetailsModal extends StatelessWidget {
   final QueryDocumentSnapshot listing;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  const _ListingDetailsModal({required this.listing});
+  _ListingDetailsModal({required this.listing});
+
+  Future<void> _addToCart(BuildContext context) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to add items to cart')),
+      );
+      return;
+    }
+
+    final data = listing.data() as Map<String, dynamic>;
+    final listingId = listing.id;
+    final title = data['title'] ?? 'No Title';
+    final price = data['price'] ?? 0.0;
+    final imageUrl = data['imageUrl'] ?? 'assets/images/placeholder.png';
+    final sellerId = data['userId'];
+
+    if (sellerId == currentUser.uid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You cannot add your own listing to cart')),
+      );
+      return;
+    }
+
+    try {
+      // Check if the item is already in the cart
+      final cartItem = await _firestore
+          .collection('carts')
+          .doc(currentUser.uid)
+          .collection('items')
+          .doc(listingId)
+          .get();
+
+      if (cartItem.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Item already in cart')),
+        );
+        return;
+      }
+
+      await _firestore
+          .collection('carts')
+          .doc(currentUser.uid)
+          .collection('items')
+          .doc(listingId)
+          .set({
+        'listingId': listingId,
+        'title': title,
+        'price': price,
+        'imageUrl': imageUrl,
+        'sellerId': sellerId,
+        'quantity': 1, // Default quantity
+        'addedAt': FieldValue.serverTimestamp(),
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$title added to cart!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error adding to cart: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -976,18 +1065,11 @@ class _ListingDetailsModal extends StatelessWidget {
                             });
                           }
                           
-                          // Close the modal and navigate to chat
+                          // Close the modal and navigate to chat with parameters
                           if (context.mounted) {
                             Navigator.of(context).pop(); // Close listing details
-                            // Navigate to home screen with chat tab selected
-                            context.go('/'); // This will go to home
-                            // You'll need to add logic to switch to chat tab
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Chat opened! Go to Chat tab to message the seller.'),
-                                duration: Duration(seconds: 3),
-                              ),
-                            );
+                            // Navigate to home with chat parameters using replace to avoid caching issues
+                            context.replace('/?chatId=$chatId&userId=$userId');
                           }
                         } catch (e) {
                           if (context.mounted) {
@@ -1009,14 +1091,7 @@ class _ListingDetailsModal extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        // TODO: Implement add to cart or buy
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('$title added to cart!'),
-                          ),
-                        );
-                      },
+                      onPressed: () => _addToCart(context),
                       icon: const Icon(Icons.shopping_cart),
                       label: const Text('Add to Cart'),
                       style: ElevatedButton.styleFrom(
