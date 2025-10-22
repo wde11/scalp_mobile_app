@@ -11,6 +11,36 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
+  final TextEditingController _currentLocationController = TextEditingController();
+  final TextEditingController _destinationController = TextEditingController();
+  
+  LatLng? _currentLocationLatLng;
+  LatLng? _destinationLatLng;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentLocationController.text = 'Father Selga, Bangkerohan, Davao City';
+    _destinationController.text = 'Malvar St, Davao City';
+    
+    // Set initial locations
+    _currentLocationLatLng = const LatLng(10.3157, 123.8854);
+    _destinationLatLng = const LatLng(10.3165, 123.8889);
+  }
+
+  @override
+  void dispose() {
+    _currentLocationController.dispose();
+    _destinationController.dispose();
+    super.dispose();
+  }
+
+  void _getCurrentLocation() {
+    // Placeholder: In a real app, you'd use geolocator package
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Getting current location...')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +51,7 @@ class _MapScreenState extends State<MapScreen> {
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
-              initialCenter: const LatLng(10.3157, 123.8854), // Example: Cebu City
+              initialCenter: const LatLng(10.3157, 123.8854),
               initialZoom: 13.0,
               interactionOptions: const InteractionOptions(
                 flags: InteractiveFlag.all,
@@ -32,71 +62,161 @@ class _MapScreenState extends State<MapScreen> {
                 urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                 subdomains: const ['a', 'b', 'c'],
               ),
+              // Markers for current location and destination
+              MarkerLayer(
+                markers: [
+                  if (_currentLocationLatLng != null)
+                    Marker(
+                      point: _currentLocationLatLng!,
+                      width: 40,
+                      height: 40,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF1E88E5),
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 4,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.my_location, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  if (_destinationLatLng != null)
+                    Marker(
+                      point: _destinationLatLng!,
+                      width: 40,
+                      height: 40,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFFFF6B6B),
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 4,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.location_on, color: Colors.white, size: 20),
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
 
-          // Top Elements: Input fields for location and destination
+          // Top Elements: Location Info Card
           Positioned(
-            top: 50,
+            top: 16,
             left: 16,
             right: 16,
-            child: Column(
-              children: [
-                _buildLocationInputField(
-                  icon: Icons.my_location,
-                  hintText: 'Current Location',
-                ),
-                const SizedBox(height: 8),
-                _buildLocationInputField(
-                  icon: Icons.location_on,
-                  hintText: 'Destination',
-                ),
-              ],
-            ),
-          ),
-
-          // Bottom-Left Element: Product card
-          Positioned(
-            bottom: 16,
-            left: 16,
             child: Card(
-              elevation: 4,
+              elevation: 8,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Row(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset(
-                      'assets/images/motherboard.jpg', // Placeholder image
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.cover,
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Motherboard',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                    // Current Location
+                    Row(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF1E88E5),
+                            shape: BoxShape.circle,
                           ),
                         ),
-                        SizedBox(height: 4),
-                        Text(
-                          '₱5,000',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.black54,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Current Location',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _currentLocationController,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.my_location, size: 18),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.my_location_rounded, size: 18),
+                          onPressed: _getCurrentLocation,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Destination
+                    Row(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFF6B6B),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Destination',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _destinationController,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.location_on, size: 18),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Colors.grey, width: 1),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                      ),
+                    ),
                   ],
-                ), 
+                ),
               ),
             ),
           ),
@@ -134,23 +254,6 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildLocationInputField({required IconData icon, required String hintText}) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TextField(
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: Colors.black54),
-          hintText: hintText,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
-        ),
       ),
     );
   }
