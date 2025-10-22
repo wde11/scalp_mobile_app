@@ -4,8 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io';
-import 'dart:typed_data';
 
 // A modern chat UI with Firestore and Cloudinary integration
 class ChatScreen extends StatefulWidget {
@@ -52,6 +50,31 @@ class _ChatScreenState extends State<ChatScreen> {
   String _generateChatId(String userId1, String userId2) {
     final sortedIds = [userId1, userId2]..sort();
     return '${sortedIds[0]}_${sortedIds[1]}';
+  }
+  
+  // Format timestamp for chat list
+  String _formatTimestamp(Timestamp? timestamp) {
+    if (timestamp == null) return '';
+    
+    final now = DateTime.now();
+    final messageTime = timestamp.toDate();
+    final difference = now.difference(messageTime);
+    
+    if (difference.inDays == 0) {
+      // Today - show time
+      final hour = messageTime.hour > 12 ? messageTime.hour - 12 : messageTime.hour;
+      final period = messageTime.hour >= 12 ? 'PM' : 'AM';
+      return '${hour == 0 ? 12 : hour}:${messageTime.minute.toString().padLeft(2, '0')} $period';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      // This week - show day name
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      return days[messageTime.weekday % 7];
+    } else {
+      // Older - show date
+      return '${messageTime.month}/${messageTime.day}/${messageTime.year % 100}';
+    }
   }
   
   Future<void> _sendMessage({String? imageUrl}) async {
@@ -192,10 +215,23 @@ class _ChatScreenState extends State<ChatScreen> {
         final userDoc = await _firestore.collection('users').doc(otherUserId).get();
         final userData = userDoc.data() ?? {};
         
+        // If no name in Firestore, try to get it from Firebase Auth or email
+        String displayName = userData['name'] ?? '';
+        if (displayName.isEmpty) {
+          // Try to get from email (use part before @)
+          final userEmail = userData['email'] ?? '';
+          if (userEmail.isNotEmpty) {
+            displayName = userEmail.split('@')[0];
+          } else {
+            displayName = 'User ${otherUserId.substring(0, 6)}';
+          }
+        }
+        
         chats.add({
           'chatId': doc.id,
           'userId': otherUserId,
-          'name': userData['name'] ?? 'Unknown User',
+          'name': displayName,
+          'username': userData['username'] ?? '',
           'avatar': userData['profilePicture'] ?? 'https://i.pravatar.cc/150?img=1',
           'lastMessage': data['lastMessage'] ?? '',
           'lastMessageTime': data['lastMessageTime'],
@@ -276,7 +312,28 @@ class _ChatScreenState extends State<ChatScreen> {
                     : Future.value(null),
                 builder: (context, snapshot) {
                   final userData = snapshot.data?.data() as Map<String, dynamic>?;
-                  final userName = userData?['name'] ?? 'Chats';
+                  
+                  // Handle missing user data gracefully
+                  String userName = 'Chats';
+                  String userUsername = '';
+                  
+                  if (_selectedUserId != null) {
+                    userName = userData?['name'] ?? '';
+                    userUsername = userData?['username'] ?? '';
+                    
+                    if (userName.isEmpty) {
+                      final userEmail = userData?['email'] ?? '';
+                      if (userEmail.isNotEmpty) {
+                        userName = userEmail.split('@')[0];
+                        if (userUsername.isEmpty) {
+                          userUsername = userEmail.split('@')[0].toLowerCase();
+                        }
+                      } else {
+                        userName = 'User';
+                      }
+                    }
+                  }
+                  
                   final userAvatar = userData?['profilePicture'] ?? 'https://i.pravatar.cc/150?img=1';
                   
                   return Scaffold(
@@ -289,7 +346,17 @@ class _ChatScreenState extends State<ChatScreen> {
                               children: [
                                 CircleAvatar(backgroundImage: NetworkImage(userAvatar)),
                                 const SizedBox(width: 12),
-                                Text(userName, style: const TextStyle(color: Colors.black87)),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(userName, style: const TextStyle(color: Colors.black87, fontSize: 16)),
+                                    if (userUsername.isNotEmpty)
+                                      Text(
+                                        '@$userUsername',
+                                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                      ),
+                                  ],
+                                ),
                               ],
                             )
                           : const Text('Chats', style: TextStyle(color: Colors.black87)),
@@ -347,10 +414,170 @@ class _ChatScreenState extends State<ChatScreen> {
                   prefixIcon: Icon(Icons.search, color: Colors.grey),
                   contentPadding: EdgeInsets.symmetric(vertical: 14),
                 ),
+                onChanged: (value) {
+                  setState(() {}); // Trigger rebuild to filter chats
+                },
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          // Recent Chats Section - Shows most recently messaged users
+          StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _getUserChatsStream(),
+            builder: (context, recentSnapshot) {
+              if (!recentSnapshot.hasData || recentSnapshot.data!.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              
+              // Get only chats with actual messages (filter out empty chats)
+              final recentChats = recentSnapshot.data!
+                  .where((chat) => chat['lastMessage']?.toString().isNotEmpty ?? false)
+                  .take(6)
+                  .toList();
+              
+              if (recentChats.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'Recent Chats',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF121330),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF1FF),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${recentChats.length}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF3864FF),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 90,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: recentChats.length,
+                      itemBuilder: (context, index) {
+                        final chat = recentChats[index];
+                        final isSelected = chat['chatId'] == _selectedChatId;
+                        
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedChatId = chat['chatId'];
+                              _selectedUserId = chat['userId'];
+                            });
+                          },
+                          child: Container(
+                            width: 70,
+                            margin: const EdgeInsets.only(right: 12),
+                            child: Column(
+                              children: [
+                                Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: isSelected
+                                            ? Border.all(
+                                                color: const Color(0xFF3864FF),
+                                                width: 3,
+                                              )
+                                            : null,
+                                        boxShadow: isSelected
+                                            ? [
+                                                BoxShadow(
+                                                  color: const Color(0xFF3864FF).withOpacity(0.3),
+                                                  blurRadius: 8,
+                                                  spreadRadius: 2,
+                                                )
+                                              ]
+                                            : null,
+                                      ),
+                                      child: CircleAvatar(
+                                        radius: 28,
+                                        backgroundImage: NetworkImage(chat['avatar']),
+                                      ),
+                                    ),
+                                    // Online status indicator
+                                    Positioned(
+                                      right: 0,
+                                      bottom: 0,
+                                      child: Container(
+                                        width: 14,
+                                        height: 14,
+                                        decoration: BoxDecoration(
+                                          color: Colors.green,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.white,
+                                            width: 2,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  chat['name'].toString().split(' ')[0],
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                    color: isSelected ? const Color(0xFF3864FF) : const Color(0xFF121330),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20.0),
+                    child: Text(
+                      'All Chats',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF121330),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              );
+            },
+          ),
           Expanded(
             child: StreamBuilder<List<Map<String, dynamic>>>(
               stream: _getUserChatsStream(),
@@ -374,11 +601,37 @@ class _ChatScreenState extends State<ChatScreen> {
                 
                 final chats = snapshot.data!;
                 
+                // Filter chats based on search query
+                final searchQuery = _searchController.text.toLowerCase();
+                final filteredChats = searchQuery.isEmpty
+                    ? chats
+                    : chats.where((chat) {
+                        final name = (chat['name'] ?? '').toString().toLowerCase();
+                        final username = (chat['username'] ?? '').toString().toLowerCase();
+                        final lastMessage = (chat['lastMessage'] ?? '').toString().toLowerCase();
+                        return name.contains(searchQuery) || 
+                               username.contains(searchQuery) ||
+                               lastMessage.contains(searchQuery);
+                      }).toList();
+                
+                if (filteredChats.isEmpty) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: Text(
+                        'No chats match your search',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  );
+                }
+                
                 return ListView.separated(
-                  itemCount: chats.length,
+                  itemCount: filteredChats.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 6),
                   itemBuilder: (context, index) {
-                    final chat = chats[index];
+                    final chat = filteredChats[index];
                     final isSelected = chat['chatId'] == _selectedChatId;
                     
                     return Padding(
@@ -405,13 +658,39 @@ class _ChatScreenState extends State<ChatScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      chat['name'],
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        color: isSelected ? Colors.white : const Color(0xFF1E1F28),
-                                      ),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            chat['name'],
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 15,
+                                              color: isSelected ? Colors.white : const Color(0xFF1E1F28),
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          _formatTimestamp(chat['lastMessageTime']),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isSelected ? Colors.white60 : Colors.grey[500],
+                                          ),
+                                        ),
+                                      ],
                                     ),
+                                    if (chat['username'] != null && chat['username'].toString().isNotEmpty)
+                                      Text(
+                                        '@${chat['username']}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: isSelected ? Colors.white60 : Colors.grey[500],
+                                        ),
+                                      ),
                                     const SizedBox(height: 2),
                                     Text(
                                       chat['lastMessage'],
@@ -456,7 +735,24 @@ class _ChatScreenState extends State<ChatScreen> {
       future: _firestore.collection('users').doc(_selectedUserId).get(),
       builder: (context, userSnapshot) {
         final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
-        final userName = userData?['name'] ?? 'Unknown User';
+        
+        // Handle missing user data gracefully
+        String userName = userData?['name'] ?? '';
+        String userUsername = userData?['username'] ?? '';
+        
+        if (userName.isEmpty) {
+          final userEmail = userData?['email'] ?? '';
+          if (userEmail.isNotEmpty) {
+            userName = userEmail.split('@')[0];
+            if (userUsername.isEmpty) {
+              userUsername = userEmail.split('@')[0].toLowerCase();
+            }
+          } else {
+            userName = 'User';
+            userUsername = 'user';
+          }
+        }
+        
         final userAvatar = userData?['profilePicture'] ?? 'https://i.pravatar.cc/150?img=1';
         
         return Column(
@@ -469,13 +765,21 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   CircleAvatar(backgroundImage: NetworkImage(userAvatar)),
                   const SizedBox(width: 12),
-                  Text(
-                    userName,
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        userName,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                      ),
+                      if (userUsername.isNotEmpty)
+                        Text(
+                          '@$userUsername',
+                          style: const TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                    ],
                   ),
                   const Spacer(),
-                  _headerIcon(Icons.call_outlined),
-                  _headerIcon(Icons.videocam_outlined),
                   _headerIcon(Icons.info_outline),
                 ],
               ),
@@ -552,8 +856,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   _actionCircleButton(Icons.photo_outlined, _pickAndUploadImage),
                   const SizedBox(width: 8),
                   _actionCircle(Icons.camera_alt_outlined),
-                  const SizedBox(width: 8),
-                  _actionCircle(Icons.emoji_emotions_outlined),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Container(
@@ -766,7 +1068,7 @@ class _NewChatDialogState extends State<_NewChatDialog> {
               child: TextField(
                 controller: _searchController,
                 decoration: const InputDecoration(
-                  hintText: 'Search users...',
+                  hintText: 'Search by name, username, or email...',
                   border: InputBorder.none,
                   prefixIcon: Icon(Icons.search, color: Colors.grey),
                   contentPadding: EdgeInsets.symmetric(vertical: 14),
@@ -784,7 +1086,6 @@ class _NewChatDialogState extends State<_NewChatDialog> {
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('users')
-                    .orderBy('name')
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -810,11 +1111,23 @@ class _NewChatDialogState extends State<_NewChatDialog> {
                       final data = doc.data() as Map<String, dynamic>;
                       final name = (data['name'] ?? '').toString().toLowerCase();
                       final email = (data['email'] ?? '').toString().toLowerCase();
-                      return name.contains(_searchQuery) || email.contains(_searchQuery);
+                      final username = (data['username'] ?? '').toString().toLowerCase();
+                      return name.contains(_searchQuery) || 
+                             email.contains(_searchQuery) ||
+                             username.contains(_searchQuery);
                     }
                     
                     return true;
                   }).toList();
+                  
+                  // Sort users alphabetically by name
+                  allUsers.sort((a, b) {
+                    final aData = a.data() as Map<String, dynamic>;
+                    final bData = b.data() as Map<String, dynamic>;
+                    final aName = (aData['name'] ?? '').toString().toLowerCase();
+                    final bName = (bData['name'] ?? '').toString().toLowerCase();
+                    return aName.compareTo(bName);
+                  });
 
                   if (allUsers.isEmpty) {
                     return const Center(
@@ -833,6 +1146,7 @@ class _NewChatDialogState extends State<_NewChatDialog> {
                       final userData = userDoc.data() as Map<String, dynamic>;
                       final userId = userDoc.id;
                       final userName = userData['name'] ?? 'Unknown User';
+                      final username = userData['username'] ?? '';
                       final userEmail = userData['email'] ?? '';
                       final userAvatar = userData['profilePicture'] ?? 
                                        'https://i.pravatar.cc/150?u=$userId';
@@ -854,7 +1168,7 @@ class _NewChatDialogState extends State<_NewChatDialog> {
                           ),
                         ),
                         subtitle: Text(
-                          userEmail,
+                          username.isNotEmpty ? '@$username' : userEmail,
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey[600],

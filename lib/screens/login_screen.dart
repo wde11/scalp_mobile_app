@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/logo_placeholder.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -21,6 +22,43 @@ class _LoginScreenState extends State<LoginScreen> {
   
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // Ensure user document exists in Firestore
+  Future<void> _ensureUserDocument(User user) async {
+    try {
+      final displayName = user.displayName ?? user.email?.split('@')[0] ?? 'User';
+      final username = user.email?.split('@')[0].toLowerCase() ?? user.uid.substring(0, 8);
+      
+      // Use set with merge to create or update the document
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .set({
+        'name': displayName,
+        'username': username,
+        'email': user.email ?? '',
+        'profilePicture': user.photoURL ?? '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      
+      // Also set createdAt if it's a new document
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      if (userDoc.data()?['createdAt'] == null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      print('Error ensuring user document: $e');
+    }
+  }
+
   Future<void> _signInWithGoogle() async {
     if (_isLoading) return;
 
@@ -38,6 +76,8 @@ class _LoginScreenState extends State<LoginScreen> {
         // For web platform
         final userCredential = await _auth.signInWithPopup(googleProvider);
         if (mounted && userCredential.user != null) {
+          // Ensure user document exists in Firestore
+          await _ensureUserDocument(userCredential.user!);
           context.go('/');
         }
       } else {

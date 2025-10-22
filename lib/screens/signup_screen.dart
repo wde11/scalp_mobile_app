@@ -7,7 +7,7 @@ class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
   @override
-  _SignupScreenState createState() => _SignupScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
 class _SignupScreenState extends State<SignupScreen> {
@@ -37,19 +37,21 @@ class _SignupScreenState extends State<SignupScreen> {
         // Save user details to Firestore
         final user = userCredential.user;
         if (user != null) {
+          final fullName = '${_fullNameController.text.trim()} ${_lastNameController.text.trim()}';
+          final username = _emailController.text.trim().split('@')[0].toLowerCase();
+          
           await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
             'firstName': _fullNameController.text.trim(),
             'lastName': _lastNameController.text.trim(),
-            'name': '${_fullNameController.text.trim()} ${_lastNameController.text.trim()}',
+            'name': fullName,
+            'username': username,
             'email': _emailController.text.trim(),
             'birthDate': _birthDateController.text.trim(),
             'phone': _phoneNumberController.text.trim(),
+            'profilePicture': '',
             'createdAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
           });
-
-          // Update display name in Firebase Auth
-          await user.updateDisplayName('${_fullNameController.text.trim()} ${_lastNameController.text.trim()}');
         }
 
         if (mounted) {

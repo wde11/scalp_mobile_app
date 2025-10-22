@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -932,13 +933,71 @@ class _ListingDetailsModal extends StatelessWidget {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {
-                        // TODO: Implement contact seller
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Contact seller feature coming soon!'),
-                          ),
-                        );
+                      onPressed: () async {
+                        final currentUser = FirebaseAuth.instance.currentUser;
+                        if (currentUser == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please login to contact the seller'),
+                            ),
+                          );
+                          return;
+                        }
+                        
+                        if (userId == currentUser.uid) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('This is your own listing'),
+                            ),
+                          );
+                          return;
+                        }
+                        
+                        try {
+                          // Create chat ID
+                          final sortedIds = [currentUser.uid, userId]..sort();
+                          final chatId = '${sortedIds[0]}_${sortedIds[1]}';
+                          
+                          // Check if chat exists, if not create it
+                          final chatDoc = await FirebaseFirestore.instance
+                              .collection('chats')
+                              .doc(chatId)
+                              .get();
+                          
+                          if (!chatDoc.exists) {
+                            await FirebaseFirestore.instance
+                                .collection('chats')
+                                .doc(chatId)
+                                .set({
+                              'participants': [currentUser.uid, userId],
+                              'createdAt': FieldValue.serverTimestamp(),
+                              'lastMessage': '',
+                              'lastMessageTime': FieldValue.serverTimestamp(),
+                            });
+                          }
+                          
+                          // Close the modal and navigate to chat
+                          if (context.mounted) {
+                            Navigator.of(context).pop(); // Close listing details
+                            // Navigate to home screen with chat tab selected
+                            context.go('/'); // This will go to home
+                            // You'll need to add logic to switch to chat tab
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Chat opened! Go to Chat tab to message the seller.'),
+                                duration: Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error opening chat: $e'),
+                              ),
+                            );
+                          }
+                        }
                       },
                       icon: const Icon(Icons.chat_bubble_outline),
                       label: const Text('Contact Seller'),

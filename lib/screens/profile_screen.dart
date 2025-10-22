@@ -116,10 +116,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     if (newUsername != null && newUsername.isNotEmpty && currentUser != null) {
       try {
-        await _firestore.collection('users').doc(currentUser!.uid).update({
+        // Use set with merge:true to create the document if it doesn't exist
+        await _firestore.collection('users').doc(currentUser!.uid).set({
           'username': newUsername,
           'updatedAt': FieldValue.serverTimestamp(),
-        });
+        }, SetOptions(merge: true));
         
         if (mounted) {
           setState(() {}); // Refresh the UI
