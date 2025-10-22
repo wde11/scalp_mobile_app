@@ -423,7 +423,7 @@ class _ListingScreenState extends State<ListingScreen> {
 }
 
 class _CreateListingModal extends StatefulWidget {
-  const _CreateListingModal({super.key});
+  const _CreateListingModal();
 
   @override
   State<_CreateListingModal> createState() => _CreateListingModalState();
@@ -699,11 +699,10 @@ class _CreateListingModalState extends State<_CreateListingModal> {
 // Listing Details Modal
 class _ListingDetailsModal extends StatelessWidget {
   final QueryDocumentSnapshot listing;
-
-  const _ListingDetailsModal({required this.listing});
-
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  _ListingDetailsModal({required this.listing});
 
   Future<void> _addToCart(BuildContext context) async {
     final currentUser = _auth.currentUser;

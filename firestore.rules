@@ -62,5 +62,14 @@ service cloud.firestore {
                                  resource.data.senderId == request.auth.uid;
       }
     }
+
+    // Scavenger Hunt Items collection
+    match /scavenger_hunt_items/{itemId} {
+      // Anyone can read active scavenger hunt items
+      allow read: if resource.data.isActive == true;
+      
+      // Only authenticated users can claim/update items
+      allow update: if request.auth != null;
+    }
   }
 }

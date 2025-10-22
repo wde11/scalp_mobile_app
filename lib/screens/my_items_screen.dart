@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:cloudinary_public/cloudinary_public.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io';
-import 'dart:typed_data';
 
 // PC-related categories for the dropdown menu (re-using from listing_screen.dart)
 const List<String> pcCategories = [

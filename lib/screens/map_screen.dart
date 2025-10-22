@@ -21,29 +21,42 @@ class _MapScreenState extends State<MapScreen> {
   
   LatLng? _userCurrentLocation;
   bool _isLoadingLocation = false;
+  bool _mapIsOpen = false; // Track if map screen is active
   List<Map<String, dynamic>> _scavengerHuntItems = [];
 
   @override
   void initState() {
     super.initState();
+    _mapIsOpen = true; // Map is now open
     _currentLocationController.text = 'Getting location...';
     _destinationController.text = 'Malvar St, Davao City';
     
-    // Get user's actual location
-    _getUserLocation();
-    
-    // Fetch scavenger hunt items
-    _fetchScavengerHuntItems();
+    // Only get location if map is open
+    if (_mapIsOpen) {
+      _getUserLocation();
+      _fetchScavengerHuntItems();
+    }
   }
 
   @override
   void dispose() {
+    _mapIsOpen = false; // Map is closing, stop sharing location
     _currentLocationController.dispose();
     _destinationController.dispose();
     super.dispose();
   }
 
   Future<void> _getUserLocation() async {
+    // Only allow location sharing when map is open
+    if (!_mapIsOpen) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location sharing only available on Map')),
+        );
+      }
+      return;
+    }
+
     setState(() => _isLoadingLocation = true);
     
     try {
@@ -78,12 +91,6 @@ class _MapScreenState extends State<MapScreen> {
 
       // Move map to user location
       _mapController.move(_userCurrentLocation!, 15.0);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location updated!')),
-        );
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -95,6 +102,11 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _fetchScavengerHuntItems() async {
+    // Only fetch items when map is open
+    if (!_mapIsOpen) {
+      return;
+    }
+
     try {
       final snapshot = await _firestore
           .collection('scavenger_hunt_items')
@@ -118,7 +130,7 @@ class _MapScreenState extends State<MapScreen> {
         }).toList();
       });
     } catch (e) {
-      if (mounted) {
+      if (mounted && _mapIsOpen) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error fetching items: $e')),
         );
