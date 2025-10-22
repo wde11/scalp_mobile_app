@@ -326,377 +326,165 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F7F9),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final bool isWide = constraints.maxWidth >= 900;
-            if (isWide) {
-              return Row(
-                children: [
-                  SizedBox(width: 320, child: _buildSidebar(context)),
-                  const VerticalDivider(width: 1),
-                  Expanded(child: _buildChatPane(context)),
-                ],
-              );
+    // Single-page chat experience: chats list OR conversation pane
+    return FutureBuilder<DocumentSnapshot?>(
+      future: _selectedUserId != null 
+          ? _firestore.collection('users').doc(_selectedUserId).get()
+          : Future.value(null),
+      builder: (context, snapshot) {
+        final userData = snapshot.data?.data() as Map<String, dynamic>?;
+
+        // Build AppBar content based on selection
+        String titleText = 'Chats';
+        String usernameText = '';
+        String avatarUrl = 'https://i.pravatar.cc/150?img=1';
+        if (_selectedUserId != null && userData != null) {
+          titleText = (userData['name'] ?? '') as String;
+          usernameText = (userData['username'] ?? '') as String;
+          if (titleText.isEmpty) {
+            final userEmail = (userData['email'] ?? '') as String;
+            if (userEmail.isNotEmpty) {
+              titleText = userEmail.split('@')[0];
+              if (usernameText.isEmpty) usernameText = userEmail.split('@')[0].toLowerCase();
             } else {
-              // On small screens, show chat pane only, with a drawer for chats.
-              return FutureBuilder<DocumentSnapshot?>(
-                future: _selectedUserId != null 
-                    ? _firestore.collection('users').doc(_selectedUserId).get()
-                    : Future.value(null),
-                builder: (context, snapshot) {
-                  final userData = snapshot.data?.data() as Map<String, dynamic>?;
-                  
-                  // Handle missing user data gracefully
-                  String userName = 'Chats';
-                  String userUsername = '';
-                  
-                  if (_selectedUserId != null) {
-                    userName = userData?['name'] ?? '';
-                    userUsername = userData?['username'] ?? '';
-                    
-                    if (userName.isEmpty) {
-                      final userEmail = userData?['email'] ?? '';
-                      if (userEmail.isNotEmpty) {
-                        userName = userEmail.split('@')[0];
-                        if (userUsername.isEmpty) {
-                          userUsername = userEmail.split('@')[0].toLowerCase();
-                        }
-                      } else {
-                        userName = 'User';
-                      }
-                    }
-                  }
-                  
-                  final userAvatar = userData?['profilePicture'] ?? 'https://i.pravatar.cc/150?img=1';
-                  
-                  return Scaffold(
-                    appBar: AppBar(
-                      backgroundColor: Colors.white,
-                      elevation: 0.5,
-                      iconTheme: const IconThemeData(color: Colors.black87),
-                      title: _selectedUserId != null
-                          ? Row(
-                              children: [
-                                CircleAvatar(backgroundImage: NetworkImage(userAvatar)),
-                                const SizedBox(width: 12),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(userName, style: const TextStyle(color: Colors.black87, fontSize: 16)),
-                                    if (userUsername.isNotEmpty)
-                                      Text(
-                                        '@$userUsername',
-                                        style: const TextStyle(color: Colors.grey, fontSize: 12),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            )
-                          : const Text('Chats', style: TextStyle(color: Colors.black87)),
-                    ),
-                    drawer: Drawer(child: _buildSidebar(context)),
-                    body: _buildChatPane(context),
-                  );
-                },
-              );
+              titleText = 'User';
             }
-          },
-        ),
-      ),
+          }
+          avatarUrl = (userData['profilePicture'] ?? avatarUrl) as String;
+        }
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF7F7F9),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0.5,
+            leading: _selectedUserId != null
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                    onPressed: () {
+                      setState(() {
+                        _selectedChatId = null;
+                        _selectedUserId = null;
+                      });
+                    },
+                  )
+                : null,
+            title: _selectedUserId != null
+                ? Row(
+                    children: [
+                      CircleAvatar(backgroundImage: NetworkImage(avatarUrl)),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(titleText, style: const TextStyle(color: Colors.black87, fontSize: 16)),
+                          if (usernameText.isNotEmpty)
+                            Text('@$usernameText', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  )
+                : const Text('Chats', style: TextStyle(color: Colors.black87)),
+            actions: _selectedUserId == null
+                ? [
+                    IconButton(
+                      icon: const Icon(Icons.add_rounded, color: Color(0xFF121330)),
+                      onPressed: () => _showNewChatDialog(context),
+                    ),
+                  ]
+                : [
+                    IconButton(
+                      icon: const Icon(Icons.info_outline, color: Color(0xFF1F2030)),
+                      onPressed: () {},
+                    )
+                  ],
+          ),
+          body: SafeArea(
+            child: _selectedUserId == null
+                ? _buildChatsListBody(context)
+                : _buildChatPane(context),
+          ),
+        );
+      },
     );
   }
 
-  // Sidebar (Chats list + search)
-  Widget _buildSidebar(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: Row(
-              children: [
-                const Text('Chats', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
-                const Spacer(),
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEEF1FF),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.add_rounded, color: Color(0xFF121330)),
-                    onPressed: () => _showNewChatDialog(context),
-                  ),
-                ),
-              ],
+  // Unified chats list body (search + recent + all chats) in a single page
+  Widget _buildChatsListBody(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Search
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F1F5),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: TextField(
+              controller: _searchController,
+              decoration: const InputDecoration(
+                hintText: 'Search messenger...',
+                border: InputBorder.none,
+                prefixIcon: Icon(Icons.search, color: Colors.grey),
+                contentPadding: EdgeInsets.symmetric(vertical: 14),
+              ),
+              onChanged: (value) => setState(() {}),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F1F5),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: TextField(
-                controller: _searchController,
-                decoration: const InputDecoration(
-                  hintText: 'Search messenger...',
-                  border: InputBorder.none,
-                  prefixIcon: Icon(Icons.search, color: Colors.grey),
-                  contentPadding: EdgeInsets.symmetric(vertical: 14),
-                ),
-                onChanged: (value) {
-                  setState(() {}); // Trigger rebuild to filter chats
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Recent Chats Section - Shows most recently messaged users
-          StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _getUserChatsStream(),
-            builder: (context, recentSnapshot) {
-              if (recentSnapshot.hasError) {
-                return Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Text(
-                    'Error: ${recentSnapshot.error}',
-                    style: const TextStyle(color: Colors.red, fontSize: 12),
-                  ),
-                );
-              }
-              
-              if (!recentSnapshot.hasData || recentSnapshot.data!.isEmpty) {
-                return const SizedBox.shrink();
-              }
-              
-              // Get only chats with actual messages (filter out empty chats)
-              final recentChats = recentSnapshot.data!
-                  .where((chat) => chat['lastMessage']?.toString().isNotEmpty ?? false)
-                  .take(6)
-                  .toList();
-              
-              if (recentChats.isEmpty) {
-                return const SizedBox.shrink();
-              }
-              
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Row(
-                      children: [
-                        const Text(
-                          'Recent Chats',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF121330),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEEF1FF),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '${recentChats.length}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF3864FF),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 90,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: recentChats.length,
-                      itemBuilder: (context, index) {
-                        final chat = recentChats[index];
-                        final isSelected = chat['chatId'] == _selectedChatId;
-                        
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedChatId = chat['chatId'];
-                              _selectedUserId = chat['userId'];
-                            });
-                          },
-                          child: Container(
-                            width: 70,
-                            margin: const EdgeInsets.only(right: 12),
-                            child: Column(
-                              children: [
-                                Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: isSelected
-                                            ? Border.all(
-                                                color: const Color(0xFF3864FF),
-                                                width: 3,
-                                              )
-                                            : null,
-                                        boxShadow: isSelected
-                                            ? [
-                                                BoxShadow(
-                                                  color: const Color(0xFF3864FF).withOpacity(0.3),
-                                                  blurRadius: 8,
-                                                  spreadRadius: 2,
-                                                )
-                                              ]
-                                            : null,
-                                      ),
-                                      child: CircleAvatar(
-                                        radius: 28,
-                                        backgroundImage: NetworkImage(chat['avatar']),
-                                      ),
-                                    ),
-                                    // Online status indicator
-                                    Positioned(
-                                      right: 0,
-                                      bottom: 0,
-                                      child: Container(
-                                        width: 14,
-                                        height: 14,
-                                        decoration: BoxDecoration(
-                                          color: Colors.green,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: Colors.white,
-                                            width: 2,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  chat['name'].toString().split(' ')[0],
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                                    color: isSelected ? const Color(0xFF3864FF) : const Color(0xFF121330),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Text(
-                      'All Chats',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF121330),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
+        ),
+
+        const SizedBox(height: 12),
+
+        // Recent chats
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _getUserChatsStream(),
+          builder: (context, recentSnapshot) {
+            if (recentSnapshot.hasError) {
+              return Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text('Error: ${recentSnapshot.error}', style: const TextStyle(color: Colors.red, fontSize: 12)),
               );
-            },
-          ),
-          Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: _getUserChatsStream(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Text(
-                        'Error loading chats:\n${snapshot.error}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.red),
+            }
+            if (!recentSnapshot.hasData || recentSnapshot.data!.isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            final recentChats = recentSnapshot.data!
+                .where((chat) => chat['lastMessage']?.toString().isNotEmpty ?? false)
+                .take(6)
+                .toList();
+            if (recentChats.isEmpty) return const SizedBox.shrink();
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Row(
+                    children: [
+                      const Text('Recent Chats', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF121330))),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: const Color(0xFFEEF1FF), borderRadius: BorderRadius.circular(10)),
+                        child: Text('${recentChats.length}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF3864FF))),
                       ),
-                    ),
-                  );
-                }
-                
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: Text(
-                        'No chats yet.\nStart a conversation!',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                  );
-                }
-                
-                final chats = snapshot.data!;
-                
-                // Filter chats based on search query
-                final searchQuery = _searchController.text.toLowerCase();
-                final filteredChats = searchQuery.isEmpty
-                    ? chats
-                    : chats.where((chat) {
-                        final name = (chat['name'] ?? '').toString().toLowerCase();
-                        final username = (chat['username'] ?? '').toString().toLowerCase();
-                        final lastMessage = (chat['lastMessage'] ?? '').toString().toLowerCase();
-                        return name.contains(searchQuery) || 
-                               username.contains(searchQuery) ||
-                               lastMessage.contains(searchQuery);
-                      }).toList();
-                
-                if (filteredChats.isEmpty) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: Text(
-                        'No chats match your search',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                  );
-                }
-                
-                return ListView.separated(
-                  itemCount: filteredChats.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 6),
-                  itemBuilder: (context, index) {
-                    final chat = filteredChats[index];
-                    final isSelected = chat['chatId'] == _selectedChatId;
-                    
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14.0),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(22),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 90,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    itemCount: recentChats.length,
+                    itemBuilder: (context, index) {
+                      final chat = recentChats[index];
+                      final isSelected = chat['chatId'] == _selectedChatId;
+                      return GestureDetector(
                         onTap: () {
                           setState(() {
                             _selectedChatId = chat['chatId'];
@@ -704,78 +492,186 @@ class _ChatScreenState extends State<ChatScreen> {
                           });
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFF3864FF) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: Row(
+                          width: 70,
+                          margin: const EdgeInsets.only(right: 12),
+                          child: Column(
                             children: [
-                              CircleAvatar(backgroundImage: NetworkImage(chat['avatar'])),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            chat['name'],
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 15,
-                                              color: isSelected ? Colors.white : const Color(0xFF1E1F28),
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          _formatTimestamp(chat['lastMessageTime']),
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: isSelected ? Colors.white60 : Colors.grey[500],
-                                          ),
-                                        ),
-                                      ],
+                              Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: isSelected ? Border.all(color: const Color(0xFF3864FF), width: 3) : null,
+                                      boxShadow: isSelected
+                                          ? [BoxShadow(color: const Color(0xFF3864FF).withOpacity(0.3), blurRadius: 8, spreadRadius: 2)]
+                                          : null,
                                     ),
-                                    if (chat['username'] != null && chat['username'].toString().isNotEmpty)
-                                      Text(
-                                        '@${chat['username']}',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: isSelected ? Colors.white60 : Colors.grey[500],
-                                        ),
-                                      ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      chat['lastMessage'],
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: isSelected ? Colors.white70 : Colors.grey[600],
-                                      ),
+                                    child: CircleAvatar(radius: 28, backgroundImage: NetworkImage(chat['avatar'])),
+                                  ),
+                                  Positioned(
+                                    right: 0,
+                                    bottom: 0,
+                                    child: Container(
+                                      width: 14,
+                                      height: 14,
+                                      decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
                                     ),
-                                  ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                chat['name'].toString().split(' ')[0],
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                  color: isSelected ? const Color(0xFF3864FF) : const Color(0xFF121330),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Text('All Chats', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF121330))),
+                ),
+                const SizedBox(height: 8),
+              ],
+            );
+          },
+        ),
+
+        // All chats list
+        Expanded(
+          child: StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _getUserChatsStream(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Text('Error loading chats:\n${snapshot.error}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+                  ),
                 );
-              },
-            ),
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: Text('No chats yet.\nStart a conversation!', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                  ),
+                );
+              }
+
+              final chats = snapshot.data!;
+              final searchQuery = _searchController.text.toLowerCase();
+              final filteredChats = searchQuery.isEmpty
+                  ? chats
+                  : chats.where((chat) {
+                      final name = (chat['name'] ?? '').toString().toLowerCase();
+                      final username = (chat['username'] ?? '').toString().toLowerCase();
+                      final lastMessage = (chat['lastMessage'] ?? '').toString().toLowerCase();
+                      return name.contains(searchQuery) || username.contains(searchQuery) || lastMessage.contains(searchQuery);
+                    }).toList();
+
+              if (filteredChats.isEmpty) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: Text('No chats match your search', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                itemCount: filteredChats.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                itemBuilder: (context, index) {
+                  final chat = filteredChats[index];
+                  final isSelected = chat['chatId'] == _selectedChatId;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14.0),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(22),
+                      onTap: () {
+                        setState(() {
+                          _selectedChatId = chat['chatId'];
+                          _selectedUserId = chat['userId'];
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFF3864FF) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(backgroundImage: NetworkImage(chat['avatar'])),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          chat['name'],
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15,
+                                            color: isSelected ? Colors.white : const Color(0xFF1E1F28),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _formatTimestamp(chat['lastMessageTime']),
+                                        style: TextStyle(fontSize: 11, color: isSelected ? Colors.white60 : Colors.grey[500]),
+                                      ),
+                                    ],
+                                  ),
+                                  if (chat['username'] != null && chat['username'].toString().isNotEmpty)
+                                    Text('@${chat['username']}', style: TextStyle(fontSize: 11, color: isSelected ? Colors.white60 : Colors.grey[500])),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    chat['lastMessage'],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 12, color: isSelected ? Colors.white70 : Colors.grey[600]),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
           ),
-          const SizedBox(height: 8),
-        ],
-      ),
+        ),
+
+        const SizedBox(height: 8),
+      ],
     );
   }
 
