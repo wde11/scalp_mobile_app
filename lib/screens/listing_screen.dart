@@ -769,6 +769,65 @@ class _ListingDetailsModal extends StatelessWidget {
     }
   }
 
+  Future<void> _openSellerChat(BuildContext context, String sellerId, User? currentUser) async {
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to contact the seller'),
+        ),
+      );
+      return;
+    }
+
+    if (sellerId == currentUser.uid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This is your own listing'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Create chat ID
+      final sortedIds = [currentUser.uid, sellerId]..sort();
+      final chatId = '${sortedIds[0]}_${sortedIds[1]}';
+
+      // Check if chat exists, if not create it
+      final chatDoc = await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .get();
+
+      if (!chatDoc.exists) {
+        await _firestore
+            .collection('chats')
+            .doc(chatId)
+            .set({
+          'participants': [currentUser.uid, sellerId],
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastMessage': '',
+          'lastMessageTime': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Close the modal and navigate to chat
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close listing details
+        // Navigate to chat screen
+        context.push('/chat?sellerId=$sellerId&chatId=$chatId');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening chat: $e'),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = listing.data() as Map<String, dynamic>;
@@ -1019,90 +1078,49 @@ class _ListingDetailsModal extends StatelessWidget {
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final currentUser = FirebaseAuth.instance.currentUser;
-                        if (currentUser == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please login to contact the seller'),
-                            ),
-                          );
-                          return;
-                        }
-                        
-                        if (userId == currentUser.uid) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('This is your own listing'),
-                            ),
-                          );
-                          return;
-                        }
-                        
-                        try {
-                          // Create chat ID
-                          final sortedIds = [currentUser.uid, userId]..sort();
-                          final chatId = '${sortedIds[0]}_${sortedIds[1]}';
-                          
-                          // Check if chat exists, if not create it
-                          final chatDoc = await FirebaseFirestore.instance
-                              .collection('chats')
-                              .doc(chatId)
-                              .get();
-                          
-                          if (!chatDoc.exists) {
-                            await FirebaseFirestore.instance
-                                .collection('chats')
-                                .doc(chatId)
-                                .set({
-                              'participants': [currentUser.uid, userId],
-                              'createdAt': FieldValue.serverTimestamp(),
-                              'lastMessage': '',
-                              'lastMessageTime': FieldValue.serverTimestamp(),
-                            });
-                          }
-                          
-                          // Close the modal and navigate to chat
-                          if (context.mounted) {
-                            Navigator.of(context).pop(); // Close listing details
-                            // Navigate to home screen with chat tab selected
-                            context.go('/'); // This will go to home
-                            // You'll need to add logic to switch to chat tab
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Chat opened! Go to Chat tab to message the seller.'),
-                                duration: Duration(seconds: 3),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error opening chat: $e'),
-                              ),
-                            );
-                          }
-                        }
-                      },
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: const Text('Contact Seller'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                  // First row: Contact Seller and Add to Cart
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            await _openSellerChat(context, userId, currentUser);
+                          },
+                          icon: const Icon(Icons.chat_bubble_outline),
+                          label: const Text('Contact Seller'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _addToCart(context),
+                          icon: const Icon(Icons.shopping_cart),
+                          label: const Text('Add to Cart'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
+                  const SizedBox(height: 12),
+                  // Buy Now button - full width
+                  SizedBox(
+                    width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () => _addToCart(context),
-                      icon: const Icon(Icons.shopping_cart),
-                      label: const Text('Add to Cart'),
+                      onPressed: () async {
+                        await _openSellerChat(context, userId, currentUser);
+                      },
+                      icon: const Icon(Icons.shopping_bag),
+                      label: const Text('Buy Now'),
                       style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
