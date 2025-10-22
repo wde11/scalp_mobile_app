@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -82,10 +83,26 @@ class _MapScreenState extends State<MapScreen> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
+      // Get address from coordinates
+      String addressText = 'Getting address...';
+      try {
+        final placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          final street = place.street ?? 'Unknown Street';
+          final locality = place.locality ?? 'Unknown City';
+          addressText = '$street, $locality';
+        }
+      } catch (e) {
+        addressText = 'Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}';
+      }
+
       setState(() {
         _userCurrentLocation = LatLng(position.latitude, position.longitude);
-        _currentLocationController.text = 
-            'Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}';
+        _currentLocationController.text = addressText;
         _isLoadingLocation = false;
       });
 
