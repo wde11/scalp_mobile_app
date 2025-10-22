@@ -6,7 +6,14 @@ import 'package:scalp_mobile_app/screens/map_screen.dart';
 import 'package:scalp_mobile_app/screens/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String? initialChatId;
+  final String? initialUserId;
+
+  const HomeScreen({
+    super.key,
+    this.initialChatId,
+    this.initialUserId,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -14,23 +21,50 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  late final PageStorageBucket _bucket;
 
-  final List<Widget> _screens = [
-    const DashboardScreen(),
-    const ListingScreen(),
-    const MapScreen(),
-    const ChatScreen(),
-    const ProfileScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _bucket = PageStorageBucket();
+    // If we have a chat ID, navigate to chat tab and pass the chat info
+    if (widget.initialChatId != null && widget.initialUserId != null) {
+      _selectedIndex = 3; // Chat tab index
+    }
+  }
 
-  final PageStorageBucket _bucket = PageStorageBucket();
+  @override
+  void didUpdateWidget(HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Check if the initial chat IDs have changed
+    if ((widget.initialChatId != null && widget.initialUserId != null) &&
+        (widget.initialChatId != oldWidget.initialChatId || widget.initialUserId != oldWidget.initialUserId)) {
+      setState(() {
+        _selectedIndex = 3; // Chat tab index
+      });
+    }
+  }
+
+  List<Widget> _buildScreens() {
+    return [
+      const DashboardScreen(),
+      const ListingScreen(),
+      const MapScreen(),
+      ChatScreen(
+        initialChatId: widget.initialChatId,
+        initialUserId: widget.initialUserId,
+      ),
+      const ProfileScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
+    final screens = _buildScreens();
     return Scaffold(
       body: PageStorage(
         bucket: _bucket,
-        child: _screens[_selectedIndex],
+        child: screens[_selectedIndex],
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[

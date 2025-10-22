@@ -1066,18 +1066,11 @@ class _ListingDetailsModal extends StatelessWidget {
                             });
                           }
                           
-                          // Close the modal and navigate to chat
+                          // Close the modal and navigate to chat with parameters
                           if (context.mounted) {
                             Navigator.of(context).pop(); // Close listing details
-                            // Navigate to home screen with chat tab selected
-                            context.go('/'); // This will go to home
-                            // You'll need to add logic to switch to chat tab
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Chat opened! Go to Chat tab to message the seller.'),
-                                duration: Duration(seconds: 3),
-                              ),
-                            );
+                            // Navigate to home with chat parameters using replace to avoid caching issues
+                            context.replace('/?chatId=$chatId&userId=$userId');
                           }
                         } catch (e) {
                           if (context.mounted) {

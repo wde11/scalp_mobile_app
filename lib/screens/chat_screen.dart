@@ -7,7 +7,14 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 // A modern chat UI with Firestore and Cloudinary integration
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final String? initialChatId;
+  final String? initialUserId;
+
+  const ChatScreen({
+    super.key,
+    this.initialChatId,
+    this.initialUserId,
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -25,6 +32,16 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isUploading = false;
 
   User? get currentUser => _auth.currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    // If we have initial chat IDs, set them
+    if (widget.initialChatId != null && widget.initialUserId != null) {
+      _selectedChatId = widget.initialChatId;
+      _selectedUserId = widget.initialUserId;
+    }
+  }
 
   // Get or create a chat between two users
   Future<String> _getOrCreateChat(String otherUserId) async {
@@ -851,34 +868,45 @@ class _ChatScreenState extends State<ChatScreen> {
                     
                     final messages = snapshot.data!.docs;
                     
-                    return ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                      itemCount: messages.length,
-                      itemBuilder: (context, index) {
-                        final message = messages[index].data() as Map<String, dynamic>;
-                        final isMe = message['senderId'] == currentUser?.uid;
-                        final text = message['text'] ?? '';
-                        final imageUrl = message['imageUrl'];
+                    return FutureBuilder<DocumentSnapshot?>(
+                      future: currentUser != null 
+                          ? _firestore.collection('users').doc(currentUser!.uid).get()
+                          : Future.value(null),
+                      builder: (context, userSnapshot) {
+                        final currentUserData = userSnapshot.data?.data() as Map<String, dynamic>?;
+                        final currentUserAvatar = currentUserData?['profilePicture'] ?? 'https://i.pravatar.cc/150?img=3';
                         
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12.0),
-                          child: Column(
-                            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                            children: [
-                              if (imageUrl != null)
-                                _messageImageRow(
-                                  isMe: isMe,
-                                  avatar: isMe ? (currentUser?.photoURL ?? 'https://i.pravatar.cc/150?img=3') : userAvatar,
-                                  imageUrl: imageUrl,
-                                ),
-                              if (text.isNotEmpty)
-                                _messageRow(
-                                  isMe: isMe,
-                                  avatar: isMe ? (currentUser?.photoURL ?? 'https://i.pravatar.cc/150?img=3') : userAvatar,
-                                  text: text,
-                                ),
-                            ],
-                          ),
+                        return ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final message = messages[index].data() as Map<String, dynamic>;
+                            final isMe = message['senderId'] == currentUser?.uid;
+                            final text = message['text'] ?? '';
+                            final imageUrl = message['imageUrl'];
+                            final avatarUrl = isMe ? currentUserAvatar : userAvatar;
+                            
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12.0),
+                              child: Column(
+                                crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                children: [
+                                  if (imageUrl != null)
+                                    _messageImageRow(
+                                      isMe: isMe,
+                                      avatar: avatarUrl,
+                                      imageUrl: imageUrl,
+                                    ),
+                                  if (text.isNotEmpty)
+                                    _messageRow(
+                                      isMe: isMe,
+                                      avatar: avatarUrl,
+                                      text: text,
+                                    ),
+                                ],
+                              ),
+                            );
+                          },
                         );
                       },
                     );

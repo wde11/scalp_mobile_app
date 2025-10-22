@@ -16,7 +16,14 @@ class AppRouter {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => const HomeScreen(),
+        builder: (context, state) {
+          final chatId = state.uri.queryParameters['chatId'];
+          final userId = state.uri.queryParameters['userId'];
+          return HomeScreen(
+            initialChatId: chatId,
+            initialUserId: userId,
+          );
+        },
       ),
       GoRoute(
         path: '/login',
