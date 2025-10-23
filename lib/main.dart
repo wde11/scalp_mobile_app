@@ -8,7 +8,9 @@ import 'firebase_options.dart';
 Future<void> main() async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
 
     // Listen for auth state changes
     FirebaseAuth.instance.authStateChanges().listen((User? user) {

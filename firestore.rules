@@ -65,14 +65,28 @@ service cloud.firestore {
 
     // Scavenger Hunt Items collection
     match /scavenger_hunt_items/{itemId} {
-      // Authenticated users can read all scavenger hunt items
-      allow read: if request.auth != null;
+      // Anyone can read scavenger hunt items
+      allow read: if true;
       
-      // Only authenticated users can claim/update items
-      allow update: if request.auth != null;
+      // Only admins can create, update, or delete items
+      // To set admin: Use Firebase Console -> Authentication -> Select User -> Custom Claims -> Add {"admin": true}
+      allow create, update, delete: if request.auth != null && 
+                                      request.auth.token.get('admin', false) == true;
+    }
+    
+    // User claims/collected items tracking
+    match /user_claims/{claimId} {
+      // Users can only read their own claims
+      allow read: if request.auth != null && 
+                     resource.data.userId == request.auth.uid;
       
-      // Only authenticated users can create items
-      allow create: if request.auth != null;
+      // Users can create claims for themselves
+      allow create: if request.auth != null && 
+                      request.resource.data.userId == request.auth.uid;
+      
+      // Users can update/delete their own claims
+      allow update, delete: if request.auth != null && 
+                              resource.data.userId == request.auth.uid;
     }
   }
 }
