@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../widgets/logo_placeholder.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -68,7 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       if (kIsWeb) {
-        // For web platform
+        // Web platform - use popup
         final googleProvider = GoogleAuthProvider()
           ..addScope('email')
           ..addScope('https://www.googleapis.com/auth/userinfo.profile');
@@ -78,12 +79,33 @@ class _LoginScreenState extends State<LoginScreen> {
           context.go('/');
         }
       } else {
-        // For mobile platforms (requires SHA-1 certificate setup in Firebase)
-        // This code path is not used since Google Sign-In button is hidden on mobile
-        throw UnimplementedError(
-          'Google Sign-In requires additional setup for mobile platforms. '
-          'Please use email/password login or configure Google Sign-In with SHA-1 certificates.'
+        // Android/iOS platform - use google_sign_in package
+        final GoogleSignIn googleSignIn = GoogleSignIn(
+          scopes: [
+            'email',
+            'https://www.googleapis.com/auth/userinfo.profile',
+          ],
         );
+
+        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+        if (googleUser == null) {
+          // User cancelled the sign-in
+          return;
+        }
+
+        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        final userCredential = await _auth.signInWithCredential(credential);
+        if (mounted && userCredential.user != null) {
+          await _ensureUserDocument(userCredential.user!);
+          context.go('/');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -279,27 +301,26 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                       ),
                       const SizedBox(height: 24.0),
-                      // Only show Google Sign-In on web platform
-                      if (kIsWeb) ...[
-                        Row(
-                          children: <Widget>[
-                            const Expanded(child: Divider()),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8.0,
-                              ),
-                              child: Text(
-                                "Or continue with",
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
+                      // Google Sign-In available on all platforms
+                      Row(
+                        children: <Widget>[
+                          const Expanded(child: Divider()),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8.0,
                             ),
-                            const Expanded(child: Divider()),
-                          ],
-                        ),
-                        const SizedBox(height: 24.0),
-                        ElevatedButton(
-                          onPressed: _isLoading ? null : _signInWithGoogle,
-                          child: Row(
+                            child: Text(
+                              "Or continue with",
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          ),
+                          const Expanded(child: Divider()),
+                        ],
+                      ),
+                      const SizedBox(height: 24.0),
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _signInWithGoogle,
+                        child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Image.asset(
@@ -324,7 +345,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                      ],
                       const SizedBox(height: 32.0),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
