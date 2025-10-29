@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import '../widgets/logo_placeholder.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -79,26 +78,12 @@ class _LoginScreenState extends State<LoginScreen> {
           context.go('/');
         }
       } else {
-        // For mobile platforms
-        final GoogleSignIn googleSignIn = GoogleSignIn();
-        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-
-        if (googleUser == null) {
-          // The user canceled the sign-in
-          return;
-        }
-
-        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-        final AuthCredential credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
+        // For mobile platforms (requires SHA-1 certificate setup in Firebase)
+        // This code path is not used since Google Sign-In button is hidden on mobile
+        throw UnimplementedError(
+          'Google Sign-In requires additional setup for mobile platforms. '
+          'Please use email/password login or configure Google Sign-In with SHA-1 certificates.'
         );
-
-        final userCredential = await _auth.signInWithCredential(credential);
-        if (mounted && userCredential.user != null) {
-          await _ensureUserDocument(userCredential.user!);
-          context.go('/');
-        }
       }
     } catch (e) {
       if (mounted) {
