@@ -19,9 +19,17 @@ class AppRouter {
         builder: (context, state) {
           final chatId = state.uri.queryParameters['chatId'];
           final userId = state.uri.queryParameters['userId'];
+          final listingId = state.uri.queryParameters['listingId'];
+          final listingTitle = state.uri.queryParameters['listingTitle'];
+          final listingPrice = state.uri.queryParameters['listingPrice'];
+          final listingImage = state.uri.queryParameters['listingImage'];
           return HomeScreen(
             initialChatId: chatId,
             initialUserId: userId,
+            listingId: listingId,
+            listingTitle: listingTitle,
+            listingPrice: listingPrice,
+            listingImage: listingImage,
           );
         },
       ),

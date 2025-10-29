@@ -76,6 +76,30 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
     }
   }
 
+  Future<void> _markAsSold(String listingId, bool currentStatus) async {
+    try {
+      await _firestore.collection('listings').doc(listingId).update({
+        'isSold': !currentStatus,
+        'soldAt': !currentStatus ? FieldValue.serverTimestamp() : null,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(!currentStatus ? 'Item marked as sold!' : 'Item marked as available'),
+            backgroundColor: !currentStatus ? Colors.green : Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating listing: $e')),
+        );
+      }
+    }
+  }
+
   void _showEditListingDialog(DocumentSnapshot listing) {
     final data = listing.data() as Map<String, dynamic>;
     final titleController = TextEditingController(text: data['title']);
@@ -236,25 +260,29 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
           }
 
           return GridView.builder(
+            padding: const EdgeInsets.all(8),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
-              childAspectRatio: 0.75,
+              childAspectRatio: 0.65,
             ),
             itemCount: snapshot.data!.docs.length,
             itemBuilder: (context, index) {
               final listing = snapshot.data!.docs[index];
               final data = listing.data() as Map<String, dynamic>;
+              final isSold = data['isSold'] ?? false;
               return _buildListItem(
                 context,
                 data['title'] ?? 'No Title',
                 data['category'] ?? 'No Category',
                 '₱${data['price']?.toString() ?? '0'}',
                 data['imageUrl'] ?? 'assets/images/placeholder.png',
+                isSold: isSold,
                 isOwner: true, // Always true for My Items screen
                 onEdit: () => _showEditListingDialog(listing),
                 onDelete: () => _deleteListing(listing.id),
+                onMarkSold: () => _markAsSold(listing.id, isSold),
               );
             },
           );
@@ -269,10 +297,12 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
     String category,
     String price,
     String imagePath, {
+    bool isSold = false,
     bool isOwner = false,
     VoidCallback? onTap,
     VoidCallback? onEdit,
     VoidCallback? onDelete,
+    VoidCallback? onMarkSold,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -293,20 +323,66 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
                             ? AssetImage(imagePath.replaceFirst('assets/', ''))
                             : NetworkImage(imagePath) as ImageProvider<Object>,
                         fit: BoxFit.cover,
+                        colorFilter: isSold
+                            ? ColorFilter.mode(
+                                Colors.black.withOpacity(0.5),
+                                BlendMode.darken,
+                              )
+                            : null,
                       ),
                     ),
                   ),
                 ),
+                // Spacing between image and buttons
+                if (isOwner) const SizedBox(height: 8),
+                // Action buttons with blue background
+                if (isOwner)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.blue,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.white, size: 20),
+                              onPressed: onEdit,
+                              tooltip: 'Edit',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.blue,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.white, size: 20),
+                              onPressed: onDelete,
+                              tooltip: 'Delete',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 8),
                 Padding(
-                  padding: const EdgeInsets.all(8.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
+                          decoration: isSold ? TextDecoration.lineThrough : null,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -321,39 +397,67 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
                       const SizedBox(height: 4),
                       Text(
                         price,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.green,
+                          color: isSold ? Colors.grey : Colors.green,
+                          decoration: isSold ? TextDecoration.lineThrough : null,
                         ),
                       ),
                     ],
                   ),
                 ),
+                // Mark as Sold button
+                if (isOwner)
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: onMarkSold,
+                        icon: Icon(
+                          isSold ? Icons.undo : Icons.check_circle,
+                          size: 18,
+                        ),
+                        label: Text(
+                          isSold ? 'Mark Available' : 'Mark as Sold',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isSold ? Colors.orange : Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
-            if (isOwner)
+            // Sold badge overlay
+            if (isSold)
               Positioned(
-                top: 4,
-                right: 4,
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.edit,
-                        color: Colors.white,
-                        shadows: [Shadow(blurRadius: 8)],
+                top: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
                       ),
-                      onPressed: onEdit,
+                    ],
+                  ),
+                  child: const Text(
+                    'SOLD',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
                     ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.delete,
-                        color: Colors.white,
-                        shadows: [Shadow(blurRadius: 8)],
-                      ),
-                      onPressed: onDelete,
-                    ),
-                  ],
+                  ),
                 ),
               ),
           ],

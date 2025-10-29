@@ -13,11 +13,19 @@ import '../globals.dart';
 class ChatScreen extends StatefulWidget {
   final String? initialChatId;
   final String? initialUserId;
+  final String? listingId;
+  final String? listingTitle;
+  final String? listingPrice;
+  final String? listingImage;
 
   const ChatScreen({
     super.key,
     this.initialChatId,
     this.initialUserId,
+    this.listingId,
+    this.listingTitle,
+    this.listingPrice,
+    this.listingImage,
   });
 
   @override
@@ -150,6 +158,217 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to send message: $e')),
+        );
+      }
+    }
+  }
+  
+  Future<void> _sendItemInquiry() async {
+    if (currentUser == null || _selectedChatId == null) return;
+    if (widget.listingId == null || widget.listingTitle == null) return;
+    
+    try {
+      final messageData = {
+        'senderId': currentUser!.uid,
+        'text': 'Is this available?',
+        'timestamp': FieldValue.serverTimestamp(),
+        'read': false,
+        'itemInquiry': {
+          'listingId': widget.listingId,
+          'title': widget.listingTitle,
+          'price': widget.listingPrice,
+          'imageUrl': widget.listingImage,
+        },
+      };
+      
+      await _firestore
+          .collection('chats')
+          .doc(_selectedChatId)
+          .collection('messages')
+          .add(messageData);
+      
+      await _firestore.collection('chats').doc(_selectedChatId).update({
+        'lastMessage': 'Item inquiry: ${widget.listingTitle}',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Inquiry sent!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send inquiry: $e')),
+        );
+      }
+    }
+  }
+  
+  Future<void> _sendQuickReply(String reply, Map<String, dynamic>? inquiryData) async {
+    if (currentUser == null || _selectedChatId == null) return;
+    
+    try {
+      final messageData = {
+        'senderId': currentUser!.uid,
+        'text': reply,
+        'timestamp': FieldValue.serverTimestamp(),
+        'read': false,
+        'quickReply': true,
+      };
+      
+      // If replying "Yes, available" include buy option
+      if (reply.toLowerCase().contains('available') && 
+          reply.toLowerCase().contains('yes') &&
+          inquiryData != null) {
+        messageData['itemAvailable'] = inquiryData;
+      }
+      
+      await _firestore
+          .collection('chats')
+          .doc(_selectedChatId)
+          .collection('messages')
+          .add(messageData);
+      
+      await _firestore.collection('chats').doc(_selectedChatId).update({
+        'lastMessage': reply,
+        'lastMessageTime': FieldValue.serverTimestamp(),
+      });
+      
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send reply: $e')),
+        );
+      }
+    }
+  }
+  
+  Future<void> _initiateBuyNow(Map<String, dynamic> itemData) async {
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Initiate Transaction'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Ready to buy "${itemData['title']}"?',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Text('Price: ₱${itemData['price']}'),
+            const SizedBox(height: 16),
+            const Text(
+              'Would you like to set a meetup location?',
+              style: TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(true);
+              _createTransaction(itemData, withLocation: false);
+            },
+            child: const Text('No, Just Buy'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop(true);
+              _createTransaction(itemData, withLocation: true);
+            },
+            icon: const Icon(Icons.location_on),
+            label: const Text('Set Meetup'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Future<void> _createTransaction(Map<String, dynamic> itemData, {required bool withLocation}) async {
+    if (currentUser == null || _selectedUserId == null) return;
+    
+    try {
+      final transactionData = {
+        'buyerId': currentUser!.uid,
+        'sellerId': _selectedUserId,
+        'listingId': itemData['listingId'],
+        'itemTitle': itemData['title'],
+        'itemPrice': double.tryParse(itemData['price'].toString()) ?? 0.0,
+        'itemImageUrl': itemData['imageUrl'],
+        'status': 'pending', // pending, accepted, completed, cancelled
+        'createdAt': FieldValue.serverTimestamp(),
+        'withMeetupLocation': withLocation,
+      };
+      
+      final transactionRef = await _firestore
+          .collection('transactions')
+          .add(transactionData);
+      
+      // Send message with transaction info
+      final messageData = {
+        'senderId': currentUser!.uid,
+        'text': withLocation 
+            ? '📦 Transaction initiated with meetup location' 
+            : '📦 Transaction initiated',
+        'timestamp': FieldValue.serverTimestamp(),
+        'read': false,
+        'transaction': {
+          'id': transactionRef.id,
+          'listingId': itemData['listingId'],
+          'title': itemData['title'],
+          'price': itemData['price'],
+          'withLocation': withLocation,
+        },
+      };
+      
+      await _firestore
+          .collection('chats')
+          .doc(_selectedChatId)
+          .collection('messages')
+          .add(messageData);
+      
+      await _firestore.collection('chats').doc(_selectedChatId).update({
+        'lastMessage': '📦 Transaction initiated',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(withLocation 
+                ? 'Transaction created! You can now share meetup location.' 
+                : 'Transaction created! Waiting for seller confirmation.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        if (withLocation) {
+          // Prompt to share location
+          Future.delayed(const Duration(seconds: 1), () {
+            if (mounted) {
+              _shareLocation();
+            }
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create transaction: $e')),
         );
       }
     }
@@ -987,6 +1206,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             final text = message['text'] ?? '';
                             final imageUrl = message['imageUrl'];
                             final locationData = message['location'];
+                            final itemInquiry = message['itemInquiry'];
+                            final itemAvailable = message['itemAvailable'];
+                            final transaction = message['transaction'];
                             final avatarUrl = isMe ? currentUserAvatar : userAvatar;
                             
                             return Padding(
@@ -1006,7 +1228,28 @@ class _ChatScreenState extends State<ChatScreen> {
                                       avatar: avatarUrl,
                                       locationData: locationData,
                                     ),
-                                  if (text.isNotEmpty)
+                                  if (itemInquiry != null)
+                                    _messageItemInquiryRow(
+                                      isMe: isMe,
+                                      avatar: avatarUrl,
+                                      text: text,
+                                      inquiryData: itemInquiry,
+                                    ),
+                                  if (itemAvailable != null)
+                                    _messageItemAvailableRow(
+                                      isMe: isMe,
+                                      avatar: avatarUrl,
+                                      text: text,
+                                      itemData: itemAvailable,
+                                    ),
+                                  if (transaction != null)
+                                    _messageTransactionRow(
+                                      isMe: isMe,
+                                      avatar: avatarUrl,
+                                      text: text,
+                                      transactionData: transaction,
+                                    ),
+                                  if (text.isNotEmpty && itemInquiry == null && itemAvailable == null && transaction == null)
                                     _messageRow(
                                       isMe: isMe,
                                       avatar: avatarUrl,
@@ -1023,6 +1266,71 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             ),
+
+            // Quick Inquiry Button (if listing data is available)
+            if (widget.listingId != null && widget.listingTitle != null)
+              Container(
+                color: Colors.blue.shade50,
+                padding: const EdgeInsets.all(12),
+                child: Card(
+                  elevation: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Row(
+                      children: [
+                        if (widget.listingImage != null)
+                          Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              image: DecorationImage(
+                                image: NetworkImage(widget.listingImage!),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                widget.listingTitle!,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (widget.listingPrice != null)
+                                Text(
+                                  '₱${widget.listingPrice}',
+                                  style: const TextStyle(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () => _sendItemInquiry(),
+                          icon: const Icon(Icons.help_outline, size: 18),
+                          label: const Text('Is this available?'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
 
             // Input area
             Container(
@@ -1319,6 +1627,270 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           ),
+        if (isMe) const SizedBox(width: 8),
+        if (isMe) avatarWidget,
+      ],
+    );
+  }
+
+  Widget _messageItemInquiryRow({
+    required bool isMe,
+    required String avatar,
+    required String text,
+    required Map<String, dynamic> inquiryData,
+  }) {
+    final alignment = isMe ? MainAxisAlignment.end : MainAxisAlignment.start;
+    final avatarWidget = CircleAvatar(radius: 16, backgroundImage: NetworkImage(avatar));
+    final bubbleColor = isMe ? const Color(0xFF3864FF) : const Color(0xFF7B7D82);
+
+    return Row(
+      mainAxisAlignment: alignment,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (!isMe) avatarWidget,
+        if (!isMe) const SizedBox(width: 8),
+        Flexible(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 300),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: bubbleColor,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (inquiryData['imageUrl'] != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          inquiryData['imageUrl'],
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            inquiryData['title'] ?? 'Item',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            '₱${inquiryData['price']}',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                  ),
+                ),
+                // Quick reply buttons for seller (receiver of inquiry)
+                if (!isMe) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _sendQuickReply('Yes, it is available!', inquiryData),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          child: const Text('✓ Available', style: TextStyle(fontSize: 12)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _sendQuickReply('Sorry, it\'s not available anymore.', null),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          child: const Text('✗ Not Available', style: TextStyle(fontSize: 12)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (isMe) const SizedBox(width: 8),
+        if (isMe) avatarWidget,
+      ],
+    );
+  }
+
+  Widget _messageItemAvailableRow({
+    required bool isMe,
+    required String avatar,
+    required String text,
+    required Map<String, dynamic> itemData,
+  }) {
+    final alignment = isMe ? MainAxisAlignment.end : MainAxisAlignment.start;
+    final avatarWidget = CircleAvatar(radius: 16, backgroundImage: NetworkImage(avatar));
+    final bubbleColor = isMe ? const Color(0xFF3864FF) : Colors.green;
+
+    return Row(
+      mainAxisAlignment: alignment,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (!isMe) avatarWidget,
+        if (!isMe) const SizedBox(width: 8),
+        Flexible(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 300),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: bubbleColor,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                // Buy Now button for buyer (receiver of availability confirmation)
+                if (!isMe) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _initiateBuyNow(itemData),
+                      icon: const Icon(Icons.shopping_cart, size: 18),
+                      label: const Text('Buy Now'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (isMe) const SizedBox(width: 8),
+        if (isMe) avatarWidget,
+      ],
+    );
+  }
+
+  Widget _messageTransactionRow({
+    required bool isMe,
+    required String avatar,
+    required String text,
+    required Map<String, dynamic> transactionData,
+  }) {
+    final alignment = isMe ? MainAxisAlignment.end : MainAxisAlignment.start;
+    final avatarWidget = CircleAvatar(radius: 16, backgroundImage: NetworkImage(avatar));
+    final bubbleColor = Colors.orange;
+
+    return Row(
+      mainAxisAlignment: alignment,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (!isMe) avatarWidget,
+        if (!isMe) const SizedBox(width: 8),
+        Flexible(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 300),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: bubbleColor,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.receipt, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Transaction Created',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  transactionData['title'] ?? 'Item',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  '₱${transactionData['price']}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (transactionData['withLocation'] == true)
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.location_on, color: Colors.white, size: 14),
+                        SizedBox(width: 4),
+                        Text(
+                          'Meetup location enabled',
+                          style: TextStyle(color: Colors.white, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
         if (isMe) const SizedBox(width: 8),
         if (isMe) avatarWidget,
       ],

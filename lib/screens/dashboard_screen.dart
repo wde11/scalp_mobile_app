@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final Function(int)? onNavigateToTab;
+  
+  const DashboardScreen({super.key, this.onNavigateToTab});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -12,6 +16,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  
+  int _itemsSoldCount = 0;
+  int _itemsBoughtCount = 0;
+  
+  User? get currentUser => _auth.currentUser;
 
   @override
   void initState() {
@@ -25,6 +36,166 @@ class _DashboardScreenState extends State<DashboardScreen>
       curve: Curves.easeIn,
     );
     _controller.forward();
+    _fetchStatistics();
+  }
+  
+  Future<void> _fetchStatistics() async {
+    if (currentUser == null) return;
+    
+    try {
+      // Count sold items
+      final soldSnapshot = await _firestore
+          .collection('listings')
+          .where('userId', isEqualTo: currentUser!.uid)
+          .where('isSold', isEqualTo: true)
+          .get();
+      
+      if (mounted) {
+        setState(() {
+          _itemsSoldCount = soldSnapshot.docs.length;
+        });
+      }
+    } catch (e) {
+      print('Error fetching statistics: $e');
+    }
+  }
+  
+  void _showSoldItemsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          constraints: const BoxConstraints(maxHeight: 600, maxWidth: 500),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Sold Items',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: currentUser != null
+                      ? _firestore
+                          .collection('listings')
+                          .where('userId', isEqualTo: currentUser!.uid)
+                          .where('isSold', isEqualTo: true)
+                          .orderBy('soldAt', descending: true)
+                          .snapshots()
+                      : null,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24.0),
+                          child: Text(
+                            'No sold items yet.\nMark items as sold to see them here!',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      );
+                    }
+                    
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: snapshot.data!.docs.length,
+                      itemBuilder: (context, index) {
+                        final doc = snapshot.data!.docs[index];
+                        final data = doc.data() as Map<String, dynamic>;
+                        final soldAt = data['soldAt'] as Timestamp?;
+                        
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                          child: ListTile(
+                            leading: Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                image: DecorationImage(
+                                  image: data['imageUrl'] != null && !data['imageUrl'].toString().startsWith('assets/')
+                                      ? NetworkImage(data['imageUrl'])
+                                      : const AssetImage('images/placeholder.png') as ImageProvider,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              data['title'] ?? 'No Title',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(data['category'] ?? 'No Category'),
+                                if (soldAt != null)
+                                  Text(
+                                    'Sold: ${_formatDate(soldAt.toDate())}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            trailing: Text(
+                              '₱${data['price']?.toString() ?? '0'}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    
+    if (difference.inDays == 0) {
+      if (difference.inHours == 0) {
+        return '${difference.inMinutes} min ago';
+      }
+      return '${difference.inHours} hr ago';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${date.month}/${date.day}/${date.year}';
+    }
   }
 
   @override
@@ -65,8 +236,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                       child: _buildStatCard(
                         context,
                         'Items Bought',
-                        '10',
-                        'Updated 2 hrs ago',
+                        _itemsBoughtCount.toString(),
+                        'Updated just now',
                         Icons.shopping_cart,
                       ),
                     ),
@@ -75,8 +246,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                       child: _buildStatCard(
                         context,
                         'Items sold',
-                        '3',
-                        'Updated 30 mins ago',
+                        _itemsSoldCount.toString(),
+                        'Updated just now',
                         Icons.sell,
                       ),
                     ),
@@ -116,19 +287,23 @@ class _DashboardScreenState extends State<DashboardScreen>
         color: Colors.transparent,
         child: GestureDetector(
           onTap: () {
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: Text(title),
-                content: Text('Detailed information about $title.'),
-                actions: [
-                  TextButton(
-                    onPressed: () => context.pop(),
-                    child: const Text('Close'),
-                  ),
-                ],
-              ),
-            );
+            if (title == 'Items sold') {
+              _showSoldItemsDialog(context);
+            } else {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text(title),
+                  content: Text('Detailed information about $title.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => context.pop(),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              );
+            }
           },
           child: Card(
             elevation: 2,
@@ -208,7 +383,12 @@ class _DashboardScreenState extends State<DashboardScreen>
         color: Colors.transparent,
         child: GestureDetector(
           onTap: () {
-            context.push('/map');
+            // Navigate to map tab (index 2)
+            if (widget.onNavigateToTab != null) {
+              widget.onNavigateToTab!(2);
+            } else {
+              context.push('/map');
+            }
           },
           child: Card(
             elevation: 4,
@@ -298,7 +478,12 @@ class _DashboardScreenState extends State<DashboardScreen>
         color: Colors.transparent,
         child: GestureDetector(
           onTap: () {
-            context.push('/listing');
+            // Navigate to listing tab (index 1)
+            if (widget.onNavigateToTab != null) {
+              widget.onNavigateToTab!(1);
+            } else {
+              context.push('/listing');
+            }
           },
           child: Card(
             elevation: 4,

@@ -74,5 +74,26 @@ service cloud.firestore {
       // Only authenticated users can create items
       allow create: if request.auth != null;
     }
+    
+    // Transactions collection
+    match /transactions/{transactionId} {
+      // Users can read transactions where they are buyer or seller
+      allow read: if request.auth != null && 
+                     (request.auth.uid == resource.data.buyerId || 
+                      request.auth.uid == resource.data.sellerId);
+      
+      // Users can create transactions if they are the buyer
+      allow create: if request.auth != null && 
+                       request.auth.uid == request.resource.data.buyerId;
+      
+      // Users can update transactions if they are buyer or seller
+      allow update: if request.auth != null && 
+                       (request.auth.uid == resource.data.buyerId || 
+                        request.auth.uid == resource.data.sellerId);
+      
+      // Only buyer can delete their transaction
+      allow delete: if request.auth != null && 
+                       request.auth.uid == resource.data.buyerId;
+    }
   }
 }

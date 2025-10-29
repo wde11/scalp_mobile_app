@@ -1068,8 +1068,10 @@ class _ListingDetailsModal extends StatelessWidget {
                           // Close the modal and navigate to chat with parameters
                           if (context.mounted) {
                             Navigator.of(context).pop(); // Close listing details
-                            // Navigate to home with chat parameters using replace to avoid caching issues
-                            context.replace('/?chatId=$chatId&userId=$userId');
+                            // Navigate to home with chat parameters and listing data for quick inquiry
+                            context.replace(
+                              '/?chatId=$chatId&userId=$userId&listingId=${listing.id}&listingTitle=${Uri.encodeComponent(title)}&listingPrice=$price&listingImage=${Uri.encodeComponent(imageUrl)}'
+                            );
                           }
                         } catch (e) {
                           if (context.mounted) {

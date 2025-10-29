@@ -10,11 +10,19 @@ import 'package:scalp_mobile_app/globals.dart';
 class HomeScreen extends StatefulWidget {
   final String? initialChatId;
   final String? initialUserId;
+  final String? listingId;
+  final String? listingTitle;
+  final String? listingPrice;
+  final String? listingImage;
 
   const HomeScreen({
     super.key,
     this.initialChatId,
     this.initialUserId,
+    this.listingId,
+    this.listingTitle,
+    this.listingPrice,
+    this.listingImage,
   });
 
   @override
@@ -72,14 +80,26 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _switchToTab(int index) {
+    if (mounted && index >= 0 && index < 5) {
+      setState(() {
+        _selectedIndex = index;
+      });
+    }
+  }
+
   List<Widget> _buildScreens() {
     return [
-      const DashboardScreen(),
+      DashboardScreen(onNavigateToTab: _switchToTab),
       const ListingScreen(),
       MapScreen(sharedLocation: SharedLocationState.sharedLocation),
       ChatScreen(
         initialChatId: widget.initialChatId,
         initialUserId: widget.initialUserId,
+        listingId: widget.listingId,
+        listingTitle: widget.listingTitle,
+        listingPrice: widget.listingPrice,
+        listingImage: widget.listingImage,
       ),
       const ProfileScreen(),
     ];
