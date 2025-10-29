@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../widgets/logo_placeholder.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -67,23 +68,37 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = true;
       });
 
-      // Create a new provider with scopes
-      final googleProvider = GoogleAuthProvider()
-        ..addScope('email')
-        ..addScope('https://www.googleapis.com/auth/userinfo.profile');
-
       if (kIsWeb) {
         // For web platform
+        final googleProvider = GoogleAuthProvider()
+          ..addScope('email')
+          ..addScope('https://www.googleapis.com/auth/userinfo.profile');
         final userCredential = await _auth.signInWithPopup(googleProvider);
         if (mounted && userCredential.user != null) {
-          // Ensure user document exists in Firestore
           await _ensureUserDocument(userCredential.user!);
           context.go('/');
         }
       } else {
         // For mobile platforms
-        await _auth.signInWithRedirect(googleProvider);
-        // Navigation will be handled by Firebase Auth state changes
+        final GoogleSignIn googleSignIn = GoogleSignIn();
+        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+        if (googleUser == null) {
+          // The user canceled the sign-in
+          return;
+        }
+
+        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+        final AuthCredential credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        final userCredential = await _auth.signInWithCredential(credential);
+        if (mounted && userCredential.user != null) {
+          await _ensureUserDocument(userCredential.user!);
+          context.go('/');
+        }
       }
     } catch (e) {
       if (mounted) {
