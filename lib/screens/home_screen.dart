@@ -78,6 +78,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Check if we should navigate to map with shared location
+    if (SharedLocationState.shouldNavigateToMap && _selectedIndex != 2) {
+      // Use post-frame callback to avoid calling setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _selectedIndex = 2; // Switch to map tab
+          });
+        }
+      });
+    }
+    
     final screens = _buildScreens();
     return Scaffold(
       body: PageStorage(

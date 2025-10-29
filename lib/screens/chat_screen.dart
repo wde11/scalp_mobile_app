@@ -33,6 +33,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String? _selectedChatId;
   String? _selectedUserId;
+  String? _selectedUserName; // Store the selected user's name
   bool _isUploading = false;
   bool _locationSharingEnabled = true; // Toggle for location sharing
 
@@ -691,6 +692,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           setState(() {
                             _selectedChatId = chat['chatId'];
                             _selectedUserId = chat['userId'];
+                            _selectedUserName = chat['userName'];
                           });
                         },
                         child: Container(
@@ -1200,9 +1202,22 @@ class _ChatScreenState extends State<ChatScreen> {
         Flexible(
           child: GestureDetector(
             onTap: () {
+              print('DEBUG: Location bubble tapped!');
               if (latitude != null && longitude != null) {
+                print('DEBUG: Location data - Lat: $latitude, Lng: $longitude');
+                // Get sender name from the selected user
+                final senderName = isMe ? 'You' : (_selectedUserName ?? 'Unknown');
+                print('DEBUG: Sender name: $senderName');
                 // Navigate to map tab with the location
-                _navigateToMapWithLocation(latitude, longitude, address);
+                _navigateToMapWithLocation(
+                  latitude, 
+                  longitude, 
+                  address,
+                  userName: senderName,
+                  userAvatar: avatar,
+                );
+              } else {
+                print('DEBUG: Location data is null!');
               }
             },
             child: Container(
@@ -1211,11 +1226,15 @@ class _ChatScreenState extends State<ChatScreen> {
               decoration: BoxDecoration(
                 color: bubbleColor,
                 borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 1,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
@@ -1223,83 +1242,91 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.location_on,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 6),
-                      const Flexible(
-                        child: Text(
-                          'Location Shared',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (address != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      address,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
-                    ),
-                  ],
-                  if (latitude != null && longitude != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Lat: ${latitude.toStringAsFixed(4)}, Lng: ${longitude.toStringAsFixed(4)}',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 10,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(
-                          Icons.touch_app,
+                          Icons.location_on,
                           color: Colors.white,
-                          size: 14,
+                          size: 20,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Tap to view on map',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 11,
-                            fontStyle: FontStyle.italic,
+                        const SizedBox(width: 6),
+                        const Flexible(
+                          child: Text(
+                            'Location Shared',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
+                    if (latitude != null && longitude != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Lat: ${latitude.toStringAsFixed(4)}, Lng: ${longitude.toStringAsFixed(4)}',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                    if (address != null && address.isNotEmpty && address != 'Location shared') ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        address,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 10,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.touch_app,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Tap to view on map',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.95),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
-                ],
+                ),
               ),
             ),
           ),
-        ),
         if (isMe) const SizedBox(width: 8),
         if (isMe) avatarWidget,
       ],
     );
   }
 
-  void _navigateToMapWithLocation(double latitude, double longitude, String? address) {
+  void _navigateToMapWithLocation(double latitude, double longitude, String? address, {String? userName, String? userAvatar}) {
+    print('DEBUG: Navigating to map with location...');
+    
     // Set the shared location in global state
     SharedLocationState.setSharedLocation(
       LocationData(
@@ -1308,10 +1335,24 @@ class _ChatScreenState extends State<ChatScreen> {
         address: address ?? 'Shared Location',
         timestamp: DateTime.now(),
       ),
+      userName: userName,
+      userAvatar: userAvatar,
     );
     
-    // Pop back to root (HomeScreen will detect the change)
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    print('DEBUG: Shared location set - shouldNavigate: ${SharedLocationState.shouldNavigateToMap}');
+    
+    // Instead of popping, we need to notify the parent widget
+    // Use a callback or rebuild the home screen
+    // For now, let's try using the Navigator to go back to root and trigger rebuild
+    Navigator.of(context).popUntil((route) {
+      print('DEBUG: Checking route: ${route.settings.name}, isFirst: ${route.isFirst}');
+      return route.isFirst;
+    });
+    
+    // Force a rebuild by waiting a bit then checking state
+    Future.delayed(const Duration(milliseconds: 100), () {
+      print('DEBUG: Attempting to trigger home screen update...');
+    });
   }
 }
 

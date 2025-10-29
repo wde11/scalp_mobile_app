@@ -79,8 +79,29 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _handleSharedLocation() async {
     if (widget.sharedLocation == null || !_mapReady) return;
     
-    // Draw route to the shared location
-    await _drawRoute(widget.sharedLocation!);
+    final sharedLoc = widget.sharedLocation!;
+    final sharedLatLng = LatLng(sharedLoc.latitude, sharedLoc.longitude);
+    
+    // Add marker for the shared location
+    setState(() {
+      _markers.removeWhere((marker) => marker.markerId.value == 'shared_location');
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('shared_location'),
+          position: sharedLatLng,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          infoWindow: InfoWindow(
+            title: 'Shared Location',
+            snippet: sharedLoc.address,
+          ),
+        ),
+      );
+    });
+    
+    // Animate camera to the shared location
+    _mapController.animateCamera(
+      CameraUpdate.newLatLngZoom(sharedLatLng, 15),
+    );
     
     // Clear the global state after handling
     SharedLocationState.clearSharedLocation();
@@ -649,6 +670,153 @@ class _MapScreenState extends State<MapScreen> {
                             ),
                           ),
                         ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else if (widget.sharedLocation != null && SharedLocationState.sharedByUserName != null)
+            // Shared location info card (Messenger style)
+            Positioned(
+              top: 50,
+              left: 16,
+              right: 16,
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          // User avatar
+                          CircleAvatar(
+                            radius: 24,
+                            backgroundImage: NetworkImage(
+                              SharedLocationState.sharedByUserAvatar ?? 
+                              'https://ui-avatars.com/api/?name=${Uri.encodeComponent(SharedLocationState.sharedByUserName!)}&background=random',
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${SharedLocationState.sharedByUserName}\'s Location',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.location_on,
+                                      size: 14,
+                                      color: Colors.red,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        widget.sharedLocation!.address,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      // Coordinates
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Latitude',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  widget.sharedLocation!.latitude.toStringAsFixed(6),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              width: 1,
+                              height: 30,
+                              color: Colors.grey[300],
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Longitude',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  widget.sharedLocation!.longitude.toStringAsFixed(6),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Get Directions button
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          // Draw route to this location
+                          await _drawRoute(widget.sharedLocation!);
+                        },
+                        icon: const Icon(Icons.directions, size: 20),
+                        label: const Text('Get Directions'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF3864FF),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 40),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
