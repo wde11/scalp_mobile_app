@@ -1,161 +1,136 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:scalp_mobile_app/models/location_data.dart';
+import 'package:scalp_mobile_app/models/transaction.dart';
+import 'package:scalp_mobile_app/services/directions_service.dart';
+import 'package:scalp_mobile_app/services/scavenger_hunt_service.dart';
+import 'package:scalp_mobile_app/models/scavenger_hunt_item.dart';
+import 'package:scalp_mobile_app/globals.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  final Transaction? activeTransaction;
+  final LocationData? sharedLocation;
+  
+  const MapScreen({super.key, this.activeTransaction, this.sharedLocation});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
 
 class _MapScreenState extends State<MapScreen> {
-  final MapController _mapController = MapController();
-  final TextEditingController _currentLocationController = TextEditingController();
-  final TextEditingController _destinationController = TextEditingController();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  
-  LatLng? _userCurrentLocation;
-  bool _isLoadingLocation = false;
-  bool _mapIsOpen = false; // Track if map screen is active
-  List<Map<String, dynamic>> _scavengerHuntItems = [];
+  late GoogleMapController _mapController;
+  LatLng _currentLocation = const LatLng(7.0779, 125.5997);
+  Set<Marker> _markers = {};
+  Set<Polyline> _polylines = {};
+  String _currentLocationName = '';
+  String _destinationName = '';
+  bool _mapReady = false;
+  String? _routeDistance;
+  String? _routeDuration;
+  final DirectionsService _directionsService = DirectionsService();
+  final ScavengerHuntService _scavengerHuntService = ScavengerHuntService();
+  List<ScavengerHuntItem> _scavengerHuntItems = [];
+  bool _showScavengerHunt = true; // Toggle to show/hide scavenger hunt items
 
   @override
   void initState() {
     super.initState();
-    _mapIsOpen = true; // Map is now open
-    _currentLocationController.text = 'Getting location...';
-    _destinationController.text = 'Malvar St, Davao City';
+    _loadScavengerHuntItems();
     
-    // Only get location if map is open
-    if (_mapIsOpen) {
-      _getUserLocation();
-      _fetchScavengerHuntItems();
+    // Check if there's a shared location to show
+    if (widget.sharedLocation != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleSharedLocation();
+      });
     }
   }
 
   @override
-  void dispose() {
-    _mapIsOpen = false; // Map is closing, stop sharing location
-    _currentLocationController.dispose();
-    _destinationController.dispose();
-    super.dispose();
+  void didUpdateWidget(MapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.activeTransaction != oldWidget.activeTransaction) {
+      _handleTransactionUpdate();
+    }
   }
 
-  Future<void> _getUserLocation() async {
-    // Only allow location sharing when map is open
-    if (!_mapIsOpen) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location sharing only available on Map')),
-        );
-      }
-      return;
+  Future<void> _handleTransactionUpdate() async {
+    if (widget.activeTransaction != null && 
+        widget.activeTransaction!.sellerLocation != null &&
+        widget.activeTransaction!.locationSharingEnabled) {
+      await _drawRoute(widget.activeTransaction!.sellerLocation!);
+    } else {
+      _clearRoute();
     }
+  }
 
-    setState(() => _isLoadingLocation = true);
+  void _loadScavengerHuntItems() {
+    _scavengerHuntService.getActiveItems().listen((items) {
+      if (mounted) {
+        setState(() {
+          _scavengerHuntItems = items;
+          _updateScavengerHuntMarkers();
+        });
+      }
+    });
+  }
+
+  Future<void> _handleSharedLocation() async {
+    if (widget.sharedLocation == null || !_mapReady) return;
     
-    try {
-      // Request permission
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
+    // Draw route to the shared location
+    await _drawRoute(widget.sharedLocation!);
+    
+    // Clear the global state after handling
+    SharedLocationState.clearSharedLocation();
+  }
+
+  void _updateScavengerHuntMarkers() async {
+    if (!_showScavengerHunt || !_mapReady) return;
+
+    // Remove old scavenger hunt markers
+    _markers.removeWhere((marker) => 
+      marker.markerId.value.startsWith('scavenger_'));
+
+    // Add new scavenger hunt markers
+    for (var item in _scavengerHuntItems) {
+      final isClaimedByMe = _scavengerHuntService.isClaimedByCurrentUser(item);
+      final isClaimed = item.isClaimed;
       
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permission denied')),
-          );
-        }
-        setState(() => _isLoadingLocation = false);
-        return;
+      // Determine marker color based on status
+      BitmapDescriptor markerIcon;
+      if (isClaimedByMe) {
+        markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+      } else if (isClaimed) {
+        markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+      } else {
+        markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
       }
 
-      // Get current position
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      _markers.add(
+        Marker(
+          markerId: MarkerId('scavenger_${item.id}'),
+          position: LatLng(item.latitude, item.longitude),
+          icon: markerIcon,
+          infoWindow: InfoWindow(
+            title: item.title,
+            snippet: '₱${item.price.toStringAsFixed(0)} - ${isClaimed ? "Claimed" : "Available"}',
+          ),
+          onTap: () => _showScavengerHuntItemDetails(item),
+        ),
       );
+    }
 
-      // Get address from coordinates
-      String addressText = 'Getting address...';
-      try {
-        final placemarks = await placemarkFromCoordinates(
-          position.latitude,
-          position.longitude,
-        );
-        if (placemarks.isNotEmpty) {
-          final place = placemarks.first;
-          final street = place.street ?? 'Unknown Street';
-          final locality = place.locality ?? 'Unknown City';
-          addressText = '$street, $locality';
-        }
-      } catch (e) {
-        addressText = 'Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}';
-      }
-
-      setState(() {
-        _userCurrentLocation = LatLng(position.latitude, position.longitude);
-        _currentLocationController.text = addressText;
-        _isLoadingLocation = false;
-      });
-
-      // Move map to user location
-      _mapController.move(_userCurrentLocation!, 15.0);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error getting location: $e')),
-        );
-      }
-      setState(() => _isLoadingLocation = false);
+    if (mounted) {
+      setState(() {});
     }
   }
 
-  Future<void> _fetchScavengerHuntItems() async {
-    // Only fetch items when map is open
-    if (!_mapIsOpen) {
-      return;
-    }
+  void _showScavengerHuntItemDetails(ScavengerHuntItem item) {
+    final isClaimedByMe = _scavengerHuntService.isClaimedByCurrentUser(item);
+    final isClaimed = item.isClaimed;
 
-    try {
-      final snapshot = await _firestore
-          .collection('scavenger_hunt_items')
-          .where('isActive', isEqualTo: true)
-          .get();
-
-      setState(() {
-        _scavengerHuntItems = snapshot.docs.map((doc) {
-          final data = doc.data();
-          return {
-            'id': doc.id,
-            'title': data['title'] ?? 'Item',
-            'price': data['price'] ?? 0,
-            'imageUrl': data['imageUrl'] ?? '',
-            'description': data['description'] ?? '',
-            'latitude': data['latitude'] ?? 0.0,
-            'longitude': data['longitude'] ?? 0.0,
-            'quantity': data['quantity'] ?? 1,
-            'claimedBy': data['claimedBy'],
-          };
-        }).toList();
-      });
-    } catch (e) {
-      if (mounted && _mapIsOpen) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching items: $e')),
-        );
-      }
-    }
-  }
-
-  void _showItemDetails(Map<String, dynamic> item) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -168,11 +143,11 @@ class _MapScreenState extends State<MapScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Item image
-            if (item['imageUrl'].isNotEmpty)
+            if (item.imageUrl.isNotEmpty)
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Image.network(
-                  item['imageUrl'],
+                  item.imageUrl,
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -180,7 +155,7 @@ class _MapScreenState extends State<MapScreen> {
                     return Container(
                       height: 200,
                       color: Colors.grey[300],
-                      child: const Icon(Icons.image_not_supported),
+                      child: const Icon(Icons.image_not_supported, size: 50),
                     );
                   },
                 ),
@@ -189,7 +164,7 @@ class _MapScreenState extends State<MapScreen> {
 
             // Title
             Text(
-              item['title'],
+              item.title,
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -199,7 +174,7 @@ class _MapScreenState extends State<MapScreen> {
 
             // Price
             Text(
-              '₱${item['price']}',
+              '₱${item.price.toStringAsFixed(0)}',
               style: const TextStyle(
                 fontSize: 20,
                 color: Colors.green,
@@ -210,34 +185,74 @@ class _MapScreenState extends State<MapScreen> {
 
             // Description
             Text(
-              item['description'],
+              item.description,
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[600],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
-            // Status
-            if (item['claimedBy'] != null)
+            // Status and action button
+            if (isClaimedByMe)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.green[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green[700]),
+                    const SizedBox(width: 8),
+                    Text(
+                      'You claimed this item!',
+                      style: TextStyle(
+                        color: Colors.green[700],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (isClaimed)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.red[100],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  'Already Claimed',
-                  style: TextStyle(color: Colors.red[700], fontWeight: FontWeight.bold),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.cancel, color: Colors.red[700]),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Already Claimed',
+                      style: TextStyle(
+                        color: Colors.red[700],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
                 ),
               )
             else
               ElevatedButton(
-                onPressed: () => _claimItem(item['id']),
+                onPressed: () => _claimItem(item),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 50),
+                  backgroundColor: const Color(0xFF3864FF),
                 ),
-                child: const Text('Claim Item'),
+                child: const Text(
+                  'Claim Item',
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
               ),
           ],
         ),
@@ -245,252 +260,525 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Future<void> _claimItem(String itemId) async {
+  Future<void> _claimItem(ScavengerHuntItem item) async {
+    Navigator.pop(context); // Close bottom sheet
+
+    final success = await _scavengerHuntService.claimItem(item.id);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? '🎉 Item claimed successfully!'
+                : 'Failed to claim item. It may have been claimed by someone else.',
+          ),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_mapReady) {
+      _mapController.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _getUserLocation() async {
+    if (!_mapReady) {
+      return;
+    }
+
     try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please login to claim items')),
-        );
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location services are disabled')),
+          );
+        }
         return;
       }
 
-      await _firestore
-          .collection('scavenger_hunt_items')
-          .doc(itemId)
-          .update({
-        'claimedBy': currentUser.uid,
-        'claimedAt': FieldValue.serverTimestamp(),
-      });
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Location permission denied')),
+            );
+          }
+          return;
+        }
+      }
 
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Item claimed successfully!')),
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission denied forever')),
+          );
+        }
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+
+      if (mounted && _mapReady) {
+        setState(() {
+          _currentLocation = LatLng(position.latitude, position.longitude);
+        });
+
+        _mapController.animateCamera(
+          CameraUpdate.newLatLngZoom(_currentLocation, 15),
         );
-        _fetchScavengerHuntItems(); // Refresh items
+
+        _getAddressFromCoordinates(position.latitude, position.longitude);
+        _updateUserMarker();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error claiming item: $e')),
+          SnackBar(content: Text('Error getting location: $e')),
         );
       }
     }
   }
 
+  Future<void> _getAddressFromCoordinates(double latitude, double longitude) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(latitude, longitude);
+      if (placemarks.isNotEmpty && mounted) {
+        Placemark place = placemarks.first;
+        final street = place.street ?? '';
+        final locality = place.locality ?? place.subLocality ?? place.administrativeArea ?? '';
+        
+        String address;
+        if (street.isNotEmpty && locality.isNotEmpty) {
+          address = '$street, $locality';
+        } else if (locality.isNotEmpty) {
+          address = locality;
+        } else if (street.isNotEmpty) {
+          address = street;
+        } else {
+          address = 'Lat: ${latitude.toStringAsFixed(4)}, Lng: ${longitude.toStringAsFixed(4)}';
+        }
+        
+        setState(() {
+          _currentLocationName = address;
+        });
+      }
+    } catch (e) {
+      // Silently fall back to coordinates if geocoding fails
+      if (mounted) {
+        setState(() {
+          _currentLocationName = 'Lat: ${latitude.toStringAsFixed(4)}, Lng: ${longitude.toStringAsFixed(4)}';
+        });
+      }
+    }
+  }
+
+  void _updateUserMarker() {
+    setState(() {
+      _markers.removeWhere((marker) => marker.markerId.value == 'user_location');
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('user_location'),
+          position: _currentLocation,
+          infoWindow: const InfoWindow(title: 'Your Location'),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+        ),
+      );
+    });
+  }
+
+  Future<void> _drawRoute(LocationData destination) async {
+    final LatLng destinationLatLng = LatLng(destination.latitude, destination.longitude);
+    
+    try {
+      final directionsData = await _directionsService.getDirections(
+        origin: _currentLocation,
+        destination: destinationLatLng,
+      );
+
+      if (directionsData != null && mounted) {
+        final polylineCoordinates = directionsData['polylineCoordinates'] as List<LatLng>;
+        
+        setState(() {
+          _polylines.clear();
+          
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('route'),
+              points: polylineCoordinates,
+              color: Colors.blue,
+              width: 5,
+            ),
+          );
+
+          _routeDistance = directionsData['distance'] as String?;
+          _routeDuration = directionsData['duration'] as String?;
+          _destinationName = destination.address;
+
+          _markers.removeWhere((marker) => marker.markerId.value == 'destination');
+          _markers.add(
+            Marker(
+              markerId: const MarkerId('destination'),
+              position: destinationLatLng,
+              infoWindow: InfoWindow(
+                title: 'Seller Location',
+                snippet: destination.address,
+              ),
+              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+            ),
+          );
+        });
+
+        _fitMapToBounds(polylineCoordinates);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error drawing route: $e')),
+        );
+      }
+    }
+  }
+
+  void _fitMapToBounds(List<LatLng> coordinates) {
+    if (coordinates.isEmpty || !_mapReady) return;
+
+    double minLat = coordinates.first.latitude;
+    double maxLat = coordinates.first.latitude;
+    double minLng = coordinates.first.longitude;
+    double maxLng = coordinates.first.longitude;
+
+    for (var coord in coordinates) {
+      if (coord.latitude < minLat) minLat = coord.latitude;
+      if (coord.latitude > maxLat) maxLat = coord.latitude;
+      if (coord.longitude < minLng) minLng = coord.longitude;
+      if (coord.longitude > maxLng) maxLng = coord.longitude;
+    }
+
+    _mapController.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLat, minLng),
+          northeast: LatLng(maxLat, maxLng),
+        ),
+        100,
+      ),
+    );
+  }
+
+  void _clearRoute() {
+    setState(() {
+      _polylines.clear();
+      _routeDistance = null;
+      _routeDuration = null;
+      _destinationName = '';
+      _markers.removeWhere((marker) => marker.markerId.value == 'destination');
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bool hasActiveTransaction = widget.activeTransaction != null && 
+                                      widget.activeTransaction!.sellerLocation != null &&
+                                      widget.activeTransaction!.locationSharingEnabled;
+    
     return Scaffold(
       body: Stack(
         children: [
-          // Full-screen map
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: const LatLng(10.3157, 123.8854),
-              initialZoom: 13.0,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all,
-              ),
+          GoogleMap(
+            onMapCreated: (controller) {
+              _mapController = controller;
+              _mapReady = true;
+              _mapController.animateCamera(
+                CameraUpdate.newLatLngZoom(_currentLocation, 15),
+              );
+              _getUserLocation().then((_) {
+                if (hasActiveTransaction) {
+                  _handleTransactionUpdate();
+                }
+                if (_showScavengerHunt) {
+                  _updateScavengerHuntMarkers();
+                }
+                // Handle shared location if any
+                if (widget.sharedLocation != null) {
+                  _handleSharedLocation();
+                }
+              });
+            },
+            initialCameraPosition: CameraPosition(
+              target: _currentLocation,
+              zoom: 15,
             ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                subdomains: const ['a', 'b', 'c'],
+            markers: _markers,
+            polylines: _polylines,
+            myLocationEnabled: false,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+          ),
+
+          if (hasActiveTransaction)
+            Positioned(
+              top: 50,
+              left: 16,
+              right: 16,
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              widget.activeTransaction!.productImage,
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => 
+                                Container(
+                                  width: 50,
+                                  height: 50,
+                                  color: Colors.grey[300],
+                                  child: const Icon(Icons.image),
+                                ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.activeTransaction!.sellerName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                Text(
+                                  widget.activeTransaction!.productName,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      
+                      Row(
+                        children: [
+                          const Icon(Icons.my_location, size: 16, color: Colors.blue),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _currentLocationName.isNotEmpty
+                                  ? _currentLocationName
+                                  : 'Current location',
+                              style: const TextStyle(fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on, size: 16, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _destinationName.isNotEmpty
+                                  ? _destinationName
+                                  : widget.activeTransaction!.sellerLocation!.address,
+                              style: const TextStyle(fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      if (_routeDistance != null && _routeDuration != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.straighten, size: 16),
+                                    const SizedBox(width: 4),
+                                    Text(_routeDistance!, style: const TextStyle(fontSize: 12)),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.access_time, size: 16),
+                                    const SizedBox(width: 4),
+                                    Text(_routeDuration!, style: const TextStyle(fontSize: 12)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
-              // Markers for scavenger hunt items
-              MarkerLayer(
-                markers: [
-                  // User's current location
-                  if (_userCurrentLocation != null)
-                    Marker(
-                      point: _userCurrentLocation!,
-                      width: 40,
-                      height: 40,
-                      child: Container(
+            )
+          else
+            Positioned(
+              top: 50,
+              left: 16,
+              right: 16,
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Current Location',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF1E88E5),
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 4,
-                              spreadRadius: 1,
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.location_on, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _currentLocationName.isNotEmpty
+                                    ? _currentLocationName
+                                    : 'Lat: ${_currentLocation.latitude.toStringAsFixed(4)}, Lng: ${_currentLocation.longitude.toStringAsFixed(4)}',
+                                style: const TextStyle(fontSize: 14),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.my_location, color: Colors.white, size: 20),
                       ),
-                    ),
-                  // Scavenger hunt items
-                  ..._scavengerHuntItems.map((item) {
-                    final isClaimedByUser = item['claimedBy'] == _auth.currentUser?.uid;
-                    final isClaimed = item['claimedBy'] != null;
-                    
-                    return Marker(
-                      point: LatLng(item['latitude'], item['longitude']),
-                      width: 50,
-                      height: 50,
-                      child: GestureDetector(
-                        onTap: () => _showItemDetails(item),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isClaimedByUser
-                                ? Colors.green
-                                : (isClaimed ? Colors.grey : Colors.orange),
-                            border: Border.all(
-                              color: Colors.white,
-                              width: 3,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
-                                blurRadius: 6,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                isClaimed ? Icons.check : Icons.shopping_bag,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                              if (!isClaimed)
-                                Text(
-                                  '₱${item['price']}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ],
+                    ],
+                  ),
+                ),
               ),
-            ],
-          ),
+            ),
 
-          // Top Elements: Location Info Card
-          Positioned(
-            top: 16,
-            left: 16,
-            right: 16,
-            child: Card(
-              elevation: 8,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
+          // Scavenger hunt legend
+          if (_showScavengerHunt && _scavengerHuntItems.isNotEmpty)
+            Positioned(
+              bottom: 150,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Current Location
-                    Row(
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF1E88E5),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                'Current Location',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      'Scavenger Hunt',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    TextField(
-                      controller: _currentLocationController,
-                      readOnly: true,
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.my_location, size: 18),
-                        suffixIcon: _isLoadingLocation
-                            ? const Padding(
-                                padding: EdgeInsets.all(12.0),
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                              )
-                            : IconButton(
-                                icon: const Icon(Icons.my_location_rounded, size: 18),
-                                onPressed: _getUserLocation,
-                              ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Colors.grey, width: 1),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                        hintText: 'Getting location...',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Scavenger Hunt Items Count
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.orange[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange, width: 1),
-                      ),
-                      child: Text(
-                        '🎯 ${_scavengerHuntItems.length} items available',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange,
-                        ),
-                      ),
-                    ),
+                    _legendItem(Colors.orange, 'Available'),
+                    const SizedBox(height: 4),
+                    _legendItem(Colors.green, 'Yours'),
+                    const SizedBox(height: 4),
+                    _legendItem(Colors.red, 'Claimed'),
                   ],
                 ),
               ),
             ),
-          ),
 
-          // Bottom-Right Elements: Zoom buttons
           Positioned(
             bottom: 16,
             right: 16,
             child: Column(
               children: [
+                // Scavenger hunt toggle button
+                FloatingActionButton(
+                  heroTag: 'toggleScavengerHunt',
+                  backgroundColor: _showScavengerHunt ? const Color(0xFF3864FF) : Colors.white,
+                  mini: true,
+                  child: Icon(
+                    Icons.card_giftcard,
+                    color: _showScavengerHunt ? Colors.white : Colors.black,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _showScavengerHunt = !_showScavengerHunt;
+                      if (_showScavengerHunt) {
+                        _updateScavengerHuntMarkers();
+                      } else {
+                        // Remove scavenger hunt markers
+                        _markers.removeWhere((marker) => 
+                          marker.markerId.value.startsWith('scavenger_'));
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
                 FloatingActionButton(
                   heroTag: 'zoomIn',
                   backgroundColor: Colors.white,
+                  mini: true,
                   child: const Icon(Icons.add, color: Colors.black),
                   onPressed: () {
-                    _mapController.move(
-                      _mapController.camera.center,
-                      _mapController.camera.zoom + 1,
+                    _mapController.animateCamera(
+                      CameraUpdate.zoomIn(),
                     );
                   },
                 ),
@@ -498,13 +786,21 @@ class _MapScreenState extends State<MapScreen> {
                 FloatingActionButton(
                   heroTag: 'zoomOut',
                   backgroundColor: Colors.white,
+                  mini: true,
                   child: const Icon(Icons.remove, color: Colors.black),
                   onPressed: () {
-                    _mapController.move(
-                      _mapController.camera.center,
-                      _mapController.camera.zoom - 1,
+                    _mapController.animateCamera(
+                      CameraUpdate.zoomOut(),
                     );
                   },
+                ),
+                const SizedBox(height: 8),
+                FloatingActionButton(
+                  heroTag: 'centerLocation',
+                  backgroundColor: Colors.white,
+                  mini: true,
+                  child: const Icon(Icons.my_location, color: Colors.black),
+                  onPressed: _getUserLocation,
                 ),
               ],
             ),
@@ -513,4 +809,19 @@ class _MapScreenState extends State<MapScreen> {
       ),
     );
   }
+
+  Widget _legendItem(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.location_on, color: color, size: 16),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10),
+        ),
+      ],
+    );
+  }
 }
+

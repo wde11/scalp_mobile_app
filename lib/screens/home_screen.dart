@@ -4,6 +4,8 @@ import 'package:scalp_mobile_app/screens/dashboard_screen.dart';
 import 'package:scalp_mobile_app/screens/listing_screen.dart';
 import 'package:scalp_mobile_app/screens/map_screen.dart';
 import 'package:scalp_mobile_app/screens/profile_screen.dart';
+import 'package:scalp_mobile_app/services/scavenger_hunt_service.dart';
+import 'package:scalp_mobile_app/globals.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? initialChatId;
@@ -22,15 +24,31 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   late final PageStorageBucket _bucket;
+  final ScavengerHuntService _scavengerHuntService = ScavengerHuntService();
+  int _unclaimedItemsCount = 0;
 
   @override
   void initState() {
     super.initState();
     _bucket = PageStorageBucket();
+    
+    // Check if we should navigate to map with shared location
+    if (SharedLocationState.shouldNavigateToMap) {
+      _selectedIndex = 2; // Map tab index
+    }
     // If we have a chat ID, navigate to chat tab and pass the chat info
-    if (widget.initialChatId != null && widget.initialUserId != null) {
+    else if (widget.initialChatId != null && widget.initialUserId != null) {
       _selectedIndex = 3; // Chat tab index
     }
+
+    // Listen to unclaimed items count
+    _scavengerHuntService.getUnclaimedItemsCount().listen((count) {
+      if (mounted) {
+        setState(() {
+          _unclaimedItemsCount = count;
+        });
+      }
+    });
   }
 
   @override
@@ -49,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return [
       const DashboardScreen(),
       const ListingScreen(),
-      const MapScreen(),
+      MapScreen(sharedLocation: SharedLocationState.sharedLocation),
       ChatScreen(
         initialChatId: widget.initialChatId,
         initialUserId: widget.initialUserId,
@@ -67,15 +85,25 @@ class _HomeScreenState extends State<HomeScreen> {
         child: screens[_selectedIndex],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
+        items: <BottomNavigationBarItem>[
+          const BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          const BottomNavigationBarItem(
             icon: Icon(Icons.shopping_bag),
             label: 'Listing',
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
-          BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chat'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          // Map tab with scavenger hunt notification badge
+          BottomNavigationBarItem(
+            icon: _unclaimedItemsCount > 0
+                ? Badge(
+                    label: Text('$_unclaimedItemsCount'),
+                    backgroundColor: Colors.red,
+                    child: const Icon(Icons.map),
+                  )
+                : const Icon(Icons.map),
+            label: 'Map',
+          ),
+          const BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chat'),
+          const BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: Colors.blue,

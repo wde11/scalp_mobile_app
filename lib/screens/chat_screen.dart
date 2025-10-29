@@ -4,6 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import '../models/location_data.dart';
+import '../globals.dart';
 
 // A modern chat UI with Firestore and Cloudinary integration
 class ChatScreen extends StatefulWidget {
@@ -30,6 +34,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _selectedChatId;
   String? _selectedUserId;
   bool _isUploading = false;
+  bool _locationSharingEnabled = true; // Toggle for location sharing
 
   User? get currentUser => _auth.currentUser;
 
@@ -94,28 +99,44 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
   
-  Future<void> _sendMessage({String? imageUrl}) async {
+  Future<void> _sendMessage({String? imageUrl, LocationData? location}) async {
     if (currentUser == null || _selectedChatId == null) return;
     
     final messageText = _messageController.text.trim();
-    if (messageText.isEmpty && imageUrl == null) return;
+    if (messageText.isEmpty && imageUrl == null && location == null) return;
     
     try {
-      await _firestore
-          .collection('chats')
-          .doc(_selectedChatId)
-          .collection('messages')
-          .add({
+      final messageData = {
         'senderId': currentUser!.uid,
         'text': messageText,
         'imageUrl': imageUrl,
         'timestamp': FieldValue.serverTimestamp(),
         'read': false,
-      });
+      };
+      
+      // Add location data if provided
+      if (location != null) {
+        messageData['location'] = {
+          'latitude': location.latitude,
+          'longitude': location.longitude,
+          'address': location.address,
+          'timestamp': location.timestamp.toIso8601String(),
+        };
+      }
+      
+      await _firestore
+          .collection('chats')
+          .doc(_selectedChatId)
+          .collection('messages')
+          .add(messageData);
       
       // Update chat's last message
+      String lastMessageText = messageText.isNotEmpty 
+          ? messageText 
+          : (location != null ? '📍 Location shared' : 'Image');
+      
       await _firestore.collection('chats').doc(_selectedChatId).update({
-        'lastMessage': messageText.isNotEmpty ? messageText : 'Image',
+        'lastMessage': lastMessageText,
         'lastMessageTime': FieldValue.serverTimestamp(),
       });
       
@@ -207,6 +228,161 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
   
+  Future<void> _shareLocation() async {
+    if (_isUploading) return;
+    
+    // Check if location sharing is enabled
+    if (!_locationSharingEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location sharing is currently disabled. Enable it from the top-right icon.'),
+          duration: Duration(seconds: 3),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.location_on, color: Color(0xFF3864FF)),
+            SizedBox(width: 8),
+            Text('Share Your Location?'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This will share your real-time GPS location with this person.',
+              style: TextStyle(fontSize: 14),
+            ),
+            SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Colors.orange),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'They will be able to see your exact coordinates and address.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3864FF),
+            ),
+            child: const Text(
+              'Share Location',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+    
+    // If user cancelled, don't proceed
+    if (confirmed != true) return;
+    
+    setState(() => _isUploading = true);
+    
+    try {
+      // Check permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied || 
+            permission == LocationPermission.deniedForever) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Location permission denied')),
+            );
+          }
+          setState(() => _isUploading = false);
+          return;
+        }
+      }
+      
+      // Get current location
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Getting your location...')),
+        );
+      }
+      
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      
+      // Get address from coordinates
+      String address = 'Location shared';
+      try {
+        final placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          final street = place.street ?? '';
+          final locality = place.locality ?? place.subLocality ?? place.administrativeArea ?? '';
+          
+          if (street.isNotEmpty && locality.isNotEmpty) {
+            address = '$street, $locality';
+          } else if (locality.isNotEmpty) {
+            address = locality;
+          } else if (street.isNotEmpty) {
+            address = street;
+          } else {
+            address = 'Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}';
+          }
+        }
+      } catch (e) {
+        address = 'Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}';
+      }
+      
+      // Create LocationData object
+      final locationData = LocationData(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        address: address,
+        timestamp: DateTime.now(),
+      );
+      
+      // Send message with location
+      await _sendMessage(location: locationData);
+      
+      setState(() => _isUploading = false);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location shared successfully')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isUploading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sharing location: $e')),
+        );
+      }
+    }
+  }
+  
   Stream<List<Map<String, dynamic>>> _getUserChatsStream() {
     if (currentUser == null) {
       print('DEBUG: No current user logged in');
@@ -254,7 +430,7 @@ class _ChatScreenState extends State<ChatScreen> {
           'userId': otherUserId,
           'name': displayName,
           'username': userData['username'] ?? '',
-          'avatar': userData['profilePicture'] ?? 'https://i.pravatar.cc/150?img=1',
+          'avatar': userData['profilePicture'] ?? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(displayName)}&background=random',
           'lastMessage': data['lastMessage'] ?? '',
           'lastMessageTime': data['lastMessageTime'],
         });
@@ -337,7 +513,7 @@ class _ChatScreenState extends State<ChatScreen> {
         // Build AppBar content based on selection
         String titleText = 'Chats';
         String usernameText = '';
-        String avatarUrl = 'https://i.pravatar.cc/150?img=1';
+        String avatarUrl = 'https://ui-avatars.com/api/?name=User&background=random';
         if (_selectedUserId != null && userData != null) {
           titleText = (userData['name'] ?? '') as String;
           usernameText = (userData['username'] ?? '') as String;
@@ -393,6 +569,32 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ]
                 : [
+                    // Location sharing toggle
+                    IconButton(
+                      icon: Icon(
+                        _locationSharingEnabled ? Icons.location_on : Icons.location_off,
+                        color: _locationSharingEnabled ? const Color(0xFF3864FF) : Colors.grey,
+                      ),
+                      tooltip: _locationSharingEnabled 
+                        ? 'Location sharing ON' 
+                        : 'Location sharing OFF',
+                      onPressed: () {
+                        setState(() {
+                          _locationSharingEnabled = !_locationSharingEnabled;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              _locationSharingEnabled
+                                  ? 'Location sharing enabled'
+                                  : 'Location sharing disabled',
+                            ),
+                            duration: const Duration(seconds: 2),
+                            backgroundColor: _locationSharingEnabled ? Colors.green : Colors.grey,
+                          ),
+                        );
+                      },
+                    ),
                     IconButton(
                       icon: const Icon(Icons.info_outline, color: Color(0xFF1F2030)),
                       onPressed: () {},
@@ -708,7 +910,7 @@ class _ChatScreenState extends State<ChatScreen> {
           }
         }
         
-        final userAvatar = userData?['profilePicture'] ?? 'https://i.pravatar.cc/150?img=1';
+        final userAvatar = userData?['profilePicture'] ?? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(userName)}&background=random';
         
         return Column(
           children: [
@@ -770,7 +972,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           : Future.value(null),
                       builder: (context, userSnapshot) {
                         final currentUserData = userSnapshot.data?.data() as Map<String, dynamic>?;
-                        final currentUserAvatar = currentUserData?['profilePicture'] ?? 'https://i.pravatar.cc/150?img=3';
+                        final currentUserName = currentUserData?['name'] ?? 'Me';
+                        final currentUserAvatar = currentUserData?['profilePicture'] ?? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(currentUserName)}&background=random';
                         
                         return ListView.builder(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -780,6 +983,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             final isMe = message['senderId'] == currentUser?.uid;
                             final text = message['text'] ?? '';
                             final imageUrl = message['imageUrl'];
+                            final locationData = message['location'];
                             final avatarUrl = isMe ? currentUserAvatar : userAvatar;
                             
                             return Padding(
@@ -792,6 +996,12 @@ class _ChatScreenState extends State<ChatScreen> {
                                       isMe: isMe,
                                       avatar: avatarUrl,
                                       imageUrl: imageUrl,
+                                    ),
+                                  if (locationData != null)
+                                    _messageLocationRow(
+                                      isMe: isMe,
+                                      avatar: avatarUrl,
+                                      locationData: locationData,
                                     ),
                                   if (text.isNotEmpty)
                                     _messageRow(
@@ -821,7 +1031,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   const SizedBox(width: 8),
                   _actionCircleButton(Icons.photo_outlined, _pickAndUploadImage),
                   const SizedBox(width: 8),
-                  _actionCircle(Icons.camera_alt_outlined),
+                  _actionCircleButton(Icons.location_on_outlined, _shareLocation),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Container(
@@ -971,6 +1181,138 @@ class _ChatScreenState extends State<ChatScreen> {
       ],
     );
   }
+  
+  Widget _messageLocationRow({required bool isMe, required String avatar, required Map<String, dynamic> locationData}) {
+    final alignment = isMe ? MainAxisAlignment.end : MainAxisAlignment.start;
+    final avatarWidget = CircleAvatar(radius: 16, backgroundImage: NetworkImage(avatar));
+    final bubbleColor = isMe ? const Color(0xFF3864FF) : const Color(0xFF7B7D82);
+    
+    final latitude = locationData['latitude'] as double?;
+    final longitude = locationData['longitude'] as double?;
+    final address = locationData['address'] as String?;
+
+    return Row(
+      mainAxisAlignment: alignment,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (!isMe) avatarWidget,
+        if (!isMe) const SizedBox(width: 8),
+        Flexible(
+          child: GestureDetector(
+            onTap: () {
+              if (latitude != null && longitude != null) {
+                // Navigate to map tab with the location
+                _navigateToMapWithLocation(latitude, longitude, address);
+              }
+            },
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 250),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: bubbleColor,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 6),
+                      const Flexible(
+                        child: Text(
+                          'Location Shared',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (address != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      address,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    ),
+                  ],
+                  if (latitude != null && longitude != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Lat: ${latitude.toStringAsFixed(4)}, Lng: ${longitude.toStringAsFixed(4)}',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 10,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.touch_app,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Tap to view on map',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (isMe) const SizedBox(width: 8),
+        if (isMe) avatarWidget,
+      ],
+    );
+  }
+
+  void _navigateToMapWithLocation(double latitude, double longitude, String? address) {
+    // Set the shared location in global state
+    SharedLocationState.setSharedLocation(
+      LocationData(
+        latitude: latitude,
+        longitude: longitude,
+        address: address ?? 'Shared Location',
+        timestamp: DateTime.now(),
+      ),
+    );
+    
+    // Pop back to root (HomeScreen will detect the change)
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
 }
 
 // Dialog to show all users and start a new chat
@@ -1115,7 +1457,7 @@ class _NewChatDialogState extends State<_NewChatDialog> {
                       final username = userData['username'] ?? '';
                       final userEmail = userData['email'] ?? '';
                       final userAvatar = userData['profilePicture'] ?? 
-                                       'https://i.pravatar.cc/150?u=$userId';
+                                       'https://ui-avatars.com/api/?name=${Uri.encodeComponent(userName)}&background=random';
 
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(
@@ -1169,4 +1511,5 @@ class _NewChatDialogState extends State<_NewChatDialog> {
 }
 
 // Placeholder for future message model if needed.
+
 

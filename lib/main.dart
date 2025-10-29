@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:scalp_mobile_app/router/app_router.dart';
 import 'package:scalp_mobile_app/theme/app_theme.dart';
 import 'firebase_options.dart';
@@ -8,6 +9,10 @@ import 'firebase_options.dart';
 Future<void> main() async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
+    
+    // Load environment variables (API keys)
+    await dotenv.load(fileName: ".env");
+    
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
     // Listen for auth state changes
