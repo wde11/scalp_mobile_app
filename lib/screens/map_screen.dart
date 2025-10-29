@@ -372,7 +372,7 @@ class _MapScreenState extends State<MapScreen> {
         }
       }
 
-      if (permission == LocationPermission.deniedForever) {
+      if (permission == Locationpermission.deniedForever) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Location permission denied forever')),
@@ -601,8 +601,8 @@ class _MapScreenState extends State<MapScreen> {
             ),
             markers: _markers,
             polylines: _polylines,
-            myLocationEnabled: false,
-            myLocationButtonEnabled: false,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
             zoomControlsEnabled: false,
           ),
 

@@ -194,7 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final displayName = userData['name'] ?? 
                             userData['username'] ?? 
                             currentUser!.displayName ?? 
-                            'User';
+                            '';
           final email = currentUser!.email ?? 'No email';
           final phone = userData['phone'] ?? 'Not provided';
           final username = userData['username'] ?? 'Not set';
@@ -211,15 +211,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ? NetworkImage(currentUser!.photoURL!)
                       : null,
                   child: currentUser!.photoURL == null
-                      ? Text(
-                          displayName[0].toUpperCase(),
-                          style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
-                        )
+                      ? (
+                        displayName.isNotEmpty 
+                          ? Text(
+                              displayName[0].toUpperCase(),
+                              style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
+                            )
+                          : const Icon(Icons.person, size: 60)
+                      )
                       : null,
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  displayName,
+                  displayName.isNotEmpty ? displayName : 'User',
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 Text(
@@ -302,7 +306,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           if (onEdit != null)
             IconButton(
-              icon: const Icon(Icons.edit, size: 20),
+              icon: Icon(Icons.edit, size: 20),
               onPressed: onEdit,
               tooltip: 'Edit $label',
             ),

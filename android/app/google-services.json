@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "819509773689-dabq1802ptvlnq4ml8erkbm7fursq685.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.scalp_mobile_app",
+            "certificate_hash": "b2c02ee2122d798a4c52e34db72f732609b95979"
+          }
+        },
+        {
           "client_id": "819509773689-8kttj4knkgtcjb06m44itd89u0uuet9v.apps.googleusercontent.com",
           "client_type": 3
         }

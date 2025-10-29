@@ -10,8 +10,8 @@ Future<void> main() async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
     
-    // Load environment variables (API keys)
-    await dotenv.load(fileName: ".env");
+    // Environment variables are now handled by native configurations
+    // await dotenv.load(fileName: ".env");
     
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
