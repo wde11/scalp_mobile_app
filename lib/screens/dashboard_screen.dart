@@ -60,10 +60,11 @@ class _DashboardScreenState extends State<DashboardScreen>
           .where('isSold', isEqualTo: true)
           .get();
       
-      // Count bought items (transactions where user is the buyer)
+      // Count bought items (transactions where user is the buyer and completed)
       final boughtSnapshot = await _firestore
           .collection('transactions')
           .where('buyerId', isEqualTo: currentUser!.uid)
+          .where('status', isEqualTo: 'completed')
           .get();
       
       if (mounted) {
@@ -258,6 +259,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ? _firestore
                           .collection('transactions')
                           .where('buyerId', isEqualTo: currentUser!.uid)
+                          .where('status', isEqualTo: 'completed')
                           .snapshots()
                       : null,
                   builder: (context, snapshot) {
@@ -313,7 +315,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                         final doc = transactions[index];
                         final data = doc.data() as Map<String, dynamic>;
                         final createdAt = data['createdAt'] as Timestamp?;
-                        final withLocation = data['withLocation'] as bool? ?? false;
+                        final completedAt = data['completedAt'] as Timestamp?;
+                        final withLocation = data['withMeetupLocation'] as bool? ?? false;
+                        final status = data['status'] ?? 'pending';
                         
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -324,20 +328,31 @@ class _DashboardScreenState extends State<DashboardScreen>
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
                                 image: DecorationImage(
-                                  image: data['imageUrl'] != null && !data['imageUrl'].toString().startsWith('assets/')
-                                      ? NetworkImage(data['imageUrl'])
+                                  image: data['itemImageUrl'] != null && !data['itemImageUrl'].toString().startsWith('assets/')
+                                      ? NetworkImage(data['itemImageUrl'])
                                       : const AssetImage('images/placeholder.png') as ImageProvider,
                                   fit: BoxFit.cover,
                                 ),
                               ),
                             ),
                             title: Text(
-                              data['listingTitle'] ?? 'No Title',
+                              data['itemTitle'] ?? 'No Title',
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                if (status == 'completed')
+                                  const Row(
+                                    children: [
+                                      Icon(Icons.check_circle, size: 14, color: Colors.green),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Completed ✓',
+                                        style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
                                 if (withLocation)
                                   const Row(
                                     children: [
@@ -349,9 +364,17 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       ),
                                     ],
                                   ),
-                                if (createdAt != null)
+                                if (completedAt != null)
                                   Text(
-                                    'Purchased: ${_formatDate(createdAt.toDate())}',
+                                    'Completed: ${_formatDate(completedAt.toDate())}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  )
+                                else if (createdAt != null)
+                                  Text(
+                                    'Created: ${_formatDate(createdAt.toDate())}',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey,
@@ -360,7 +383,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                               ],
                             ),
                             trailing: Text(
-                              '₱${data['price']?.toString() ?? '0'}',
+                              '₱${data['itemPrice']?.toString() ?? '0'}',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.green,

@@ -333,6 +333,7 @@ class _ChatScreenState extends State<ChatScreen> {
           'title': itemData['title'],
           'price': itemData['price'],
           'withLocation': withLocation,
+          'status': 'pending',
         },
       };
       
@@ -370,6 +371,134 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to create transaction: $e')),
+        );
+      }
+    }
+  }
+  
+  Future<void> _completeTransaction(String transactionId, String messageId, Map<String, dynamic> transactionData) async {
+    if (currentUser == null || _selectedChatId == null) return;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Complete Transaction?'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Mark this transaction as successfully completed?',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Text('Item: ${transactionData['title']}'),
+            Text('Price: ₱${transactionData['price']}'),
+            const SizedBox(height: 16),
+            const Text(
+              'This will:',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+            const Text(
+              '• Update your purchase history\n• Send a thank you message\n• Cannot be undone',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+            ),
+            child: const Text(
+              'Complete Transaction',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed != true) return;
+    
+    try {
+      // Update transaction status in Firestore
+      await _firestore.collection('transactions').doc(transactionId).update({
+        'status': 'completed',
+        'completedAt': FieldValue.serverTimestamp(),
+      });
+      
+      // Update the message to reflect completed status
+      await _firestore
+          .collection('chats')
+          .doc(_selectedChatId)
+          .collection('messages')
+          .doc(messageId)
+          .update({
+        'transaction.status': 'completed',
+      });
+      
+      // Send automatic thank you message
+      final thankYouMessage = {
+        'senderId': currentUser!.uid,
+        'text': '✨ Thank you for the smooth transaction! Transaction completed successfully. 🎉',
+        'timestamp': FieldValue.serverTimestamp(),
+        'read': false,
+        'systemMessage': true,
+      };
+      
+      await _firestore
+          .collection('chats')
+          .doc(_selectedChatId)
+          .collection('messages')
+          .add(thankYouMessage);
+      
+      // Update chat's last message
+      await _firestore.collection('chats').doc(_selectedChatId).update({
+        'lastMessage': '✨ Transaction completed successfully',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+      });
+      
+      // Update user's completed transactions count
+      final userRef = _firestore.collection('users').doc(currentUser!.uid);
+      await userRef.update({
+        'completedTransactions': FieldValue.increment(1),
+        'totalSpent': FieldValue.increment(double.tryParse(transactionData['price'].toString()) ?? 0.0),
+      });
+      
+      // Update seller's completed sales count
+      if (_selectedUserId != null) {
+        final sellerRef = _firestore.collection('users').doc(_selectedUserId);
+        await sellerRef.update({
+          'completedSales': FieldValue.increment(1),
+          'totalEarned': FieldValue.increment(double.tryParse(transactionData['price'].toString()) ?? 0.0),
+        });
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 Transaction completed! Thank you for your purchase.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to complete transaction: $e')),
         );
       }
     }
@@ -1277,6 +1406,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             final itemInquiry = message['itemInquiry'];
                             final itemAvailable = message['itemAvailable'];
                             final transaction = message['transaction'];
+                            final isSystemMessage = message['systemMessage'] == true;
                             final avatarUrl = isMe ? currentUserAvatar : userAvatar;
                             
                             return Padding(
@@ -1284,41 +1414,44 @@ class _ChatScreenState extends State<ChatScreen> {
                               child: Column(
                                 crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                                 children: [
-                                  if (imageUrl != null)
+                                  if (isSystemMessage)
+                                    _systemMessageRow(text: text),
+                                  if (!isSystemMessage && imageUrl != null)
                                     _messageImageRow(
                                       isMe: isMe,
                                       avatar: avatarUrl,
                                       imageUrl: imageUrl,
                                     ),
-                                  if (locationData != null)
+                                  if (!isSystemMessage && locationData != null)
                                     _messageLocationRow(
                                       isMe: isMe,
                                       avatar: avatarUrl,
                                       locationData: locationData,
                                       messageId: messageId,
                                     ),
-                                  if (itemInquiry != null)
+                                  if (!isSystemMessage && itemInquiry != null)
                                     _messageItemInquiryRow(
                                       isMe: isMe,
                                       avatar: avatarUrl,
                                       text: text,
                                       inquiryData: itemInquiry,
                                     ),
-                                  if (itemAvailable != null)
+                                  if (!isSystemMessage && itemAvailable != null)
                                     _messageItemAvailableRow(
                                       isMe: isMe,
                                       avatar: avatarUrl,
                                       text: text,
                                       itemData: itemAvailable,
                                     ),
-                                  if (transaction != null)
+                                  if (!isSystemMessage && transaction != null)
                                     _messageTransactionRow(
                                       isMe: isMe,
                                       avatar: avatarUrl,
                                       text: text,
                                       transactionData: transaction,
+                                      messageId: messageId,
                                     ),
-                                  if (text.isNotEmpty && itemInquiry == null && itemAvailable == null && transaction == null)
+                                  if (!isSystemMessage && text.isNotEmpty && itemInquiry == null && itemAvailable == null && transaction == null)
                                     _messageRow(
                                       isMe: isMe,
                                       avatar: avatarUrl,
@@ -1521,6 +1654,45 @@ class _ChatScreenState extends State<ChatScreen> {
         if (isMe) const SizedBox(width: 8),
         if (isMe) avatarWidget,
       ],
+    );
+  }
+  
+  Widget _systemMessageRow({required String text}) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.green.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.green.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.check_circle,
+              color: Colors.green,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                text,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.green,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
   
@@ -1891,10 +2063,12 @@ class _ChatScreenState extends State<ChatScreen> {
     required String avatar,
     required String text,
     required Map<String, dynamic> transactionData,
+    required String messageId,
   }) {
     final alignment = isMe ? MainAxisAlignment.end : MainAxisAlignment.start;
     final avatarWidget = CircleAvatar(radius: 16, backgroundImage: NetworkImage(avatar));
-    final bubbleColor = Colors.orange;
+    final transactionStatus = transactionData['status'] ?? 'pending';
+    final bubbleColor = transactionStatus == 'completed' ? Colors.green : Colors.orange;
 
     return Row(
       mainAxisAlignment: alignment,
@@ -1916,12 +2090,18 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.receipt, color: Colors.white, size: 20),
+                    Icon(
+                      transactionStatus == 'completed' ? Icons.check_circle : Icons.receipt,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Transaction Created',
-                        style: TextStyle(
+                        transactionStatus == 'completed' 
+                            ? 'Transaction Completed ✅'
+                            : 'Transaction Created',
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -1965,6 +2145,49 @@ class _ChatScreenState extends State<ChatScreen> {
                       ],
                     ),
                   ),
+                // Mark as Completed button for buyer (sender) if transaction is pending
+                if (isMe && transactionStatus == 'pending') ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _completeTransaction(
+                        transactionData['id'],
+                        messageId,
+                        transactionData,
+                      ),
+                      icon: const Icon(Icons.check_circle_outline, size: 18),
+                      label: const Text('Mark as Completed'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+                // Show completed status
+                if (transactionStatus == 'completed') ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified, color: Colors.white, size: 14),
+                        SizedBox(width: 4),
+                        Text(
+                          'Transaction completed successfully',
+                          style: TextStyle(color: Colors.white, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
