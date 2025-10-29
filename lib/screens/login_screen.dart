@@ -294,39 +294,52 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                       ),
                       const SizedBox(height: 24.0),
-                      Row(
-                        children: <Widget>[
-                          const Expanded(child: Divider()),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8.0,
+                      // Only show Google Sign-In on web platform
+                      if (kIsWeb) ...[
+                        Row(
+                          children: <Widget>[
+                            const Expanded(child: Divider()),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8.0,
+                              ),
+                              child: Text(
+                                "Or continue with",
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
                             ),
-                            child: Text(
-                              "Or continue with",
-                              style: TextStyle(color: Colors.grey[600]),
-                            ),
+                            const Expanded(child: Divider()),
+                          ],
+                        ),
+                        const SizedBox(height: 24.0),
+                        ElevatedButton(
+                          onPressed: _isLoading ? null : _signInWithGoogle,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image.asset(
+                                'assets/images/google_logo.png',
+                                height: 24.0,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Icon(Icons.g_mobiledata, size: 24);
+                                },
+                              ),
+                              const SizedBox(width: 12),
+                              const Text('Sign in with Google'),
+                            ],
                           ),
-                          const Expanded(child: Divider()),
-                        ],
-                      ),
-                      const SizedBox(height: 24.0),
-                      ElevatedButton(
-                        onPressed: _isLoading ? null : _signInWithGoogle,
-                        child: Image.asset(
-                          'assets/images/google_logo.png',
-                          height: 24.0,
-                        ), // Make sure to add google_logo.png in assets
-                        style: ElevatedButton.styleFrom(
-                          foregroundColor: Colors.black,
-                          backgroundColor: Colors.white,
-                          padding: const EdgeInsets.all(12.0),
-                          minimumSize: Size(48, 48),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                            side: BorderSide(color: Colors.grey[300]!),
+                          style: ElevatedButton.styleFrom(
+                            foregroundColor: Colors.black,
+                            backgroundColor: Colors.white,
+                            padding: const EdgeInsets.all(12.0),
+                            minimumSize: const Size(double.infinity, 48),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8.0),
+                              side: BorderSide(color: Colors.grey[300]!),
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: 32.0),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,

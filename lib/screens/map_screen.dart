@@ -601,8 +601,8 @@ class _MapScreenState extends State<MapScreen> {
             ),
             markers: _markers,
             polylines: _polylines,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: true,
+            myLocationEnabled: false,
+            myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
           ),
 

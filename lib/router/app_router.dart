@@ -9,11 +9,16 @@ import 'package:scalp_mobile_app/screens/profile_screen.dart';
 import 'package:scalp_mobile_app/screens/signup_screen.dart';
 import 'package:scalp_mobile_app/screens/my_cart_screen.dart';
 import 'package:scalp_mobile_app/screens/my_items_screen.dart';
+import 'package:scalp_mobile_app/screens/splash_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/splash',
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       GoRoute(
         path: '/',
         builder: (context, state) {
