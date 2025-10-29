@@ -32,6 +32,15 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _bucket = PageStorageBucket();
     
+    // Register callback for navigation
+    SharedLocationState.onNavigateToMap = () {
+      if (mounted && SharedLocationState.shouldNavigateToMap) {
+        setState(() {
+          _selectedIndex = 2; // Switch to map tab
+        });
+      }
+    };
+    
     // Check if we should navigate to map with shared location
     if (SharedLocationState.shouldNavigateToMap) {
       _selectedIndex = 2; // Map tab index
@@ -74,6 +83,13 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       const ProfileScreen(),
     ];
+  }
+
+  @override
+  void dispose() {
+    // Clear the callback when HomeScreen is disposed
+    SharedLocationState.onNavigateToMap = null;
+    super.dispose();
   }
 
   @override

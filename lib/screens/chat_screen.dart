@@ -692,7 +692,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           setState(() {
                             _selectedChatId = chat['chatId'];
                             _selectedUserId = chat['userId'];
-                            _selectedUserName = chat['userName'];
+                            _selectedUserName = chat['name']; // Fixed: was 'userName', should be 'name'
                           });
                         },
                         child: Container(
@@ -813,6 +813,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         setState(() {
                           _selectedChatId = chat['chatId'];
                           _selectedUserId = chat['userId'];
+                          _selectedUserName = chat['name']; // Added: set selected user name
                         });
                       },
                       child: Container(
@@ -1327,7 +1328,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _navigateToMapWithLocation(double latitude, double longitude, String? address, {String? userName, String? userAvatar}) {
     print('DEBUG: Navigating to map with location...');
     
-    // Set the shared location in global state
+    // Set the shared location in global state (this will trigger the callback)
     SharedLocationState.setSharedLocation(
       LocationData(
         latitude: latitude,
@@ -1340,19 +1341,14 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     
     print('DEBUG: Shared location set - shouldNavigate: ${SharedLocationState.shouldNavigateToMap}');
+    print('DEBUG: Callback registered: ${SharedLocationState.onNavigateToMap != null}');
     
-    // Instead of popping, we need to notify the parent widget
-    // Use a callback or rebuild the home screen
-    // For now, let's try using the Navigator to go back to root and trigger rebuild
-    Navigator.of(context).popUntil((route) {
-      print('DEBUG: Checking route: ${route.settings.name}, isFirst: ${route.isFirst}');
-      return route.isFirst;
-    });
-    
-    // Force a rebuild by waiting a bit then checking state
-    Future.delayed(const Duration(milliseconds: 100), () {
-      print('DEBUG: Attempting to trigger home screen update...');
-    });
+    // The callback should automatically switch the tab
+    // If we're in a nested route within ChatScreen, pop back to home first
+    if (Navigator.of(context).canPop()) {
+      print('DEBUG: Popping back to home screen...');
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 }
 
