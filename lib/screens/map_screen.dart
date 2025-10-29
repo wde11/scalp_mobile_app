@@ -82,6 +82,41 @@ class _MapScreenState extends State<MapScreen> {
     final sharedLoc = widget.sharedLocation!;
     final sharedLatLng = LatLng(sharedLoc.latitude, sharedLoc.longitude);
     
+    // Get street address for the shared location
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        sharedLoc.latitude,
+        sharedLoc.longitude,
+      );
+      if (placemarks.isNotEmpty && mounted) {
+        Placemark place = placemarks.first;
+        final street = place.street ?? '';
+        final locality = place.locality ?? place.subLocality ?? place.administrativeArea ?? '';
+        
+        String address;
+        if (street.isNotEmpty && locality.isNotEmpty) {
+          address = '$street, $locality';
+        } else if (locality.isNotEmpty) {
+          address = locality;
+        } else if (street.isNotEmpty) {
+          address = street;
+        } else {
+          address = sharedLoc.address;
+        }
+        
+        setState(() {
+          _destinationName = address;
+        });
+      }
+    } catch (e) {
+      // Fall back to the provided address
+      if (mounted) {
+        setState(() {
+          _destinationName = sharedLoc.address;
+        });
+      }
+    }
+    
     // Add marker for the shared location
     setState(() {
       _markers.removeWhere((marker) => marker.markerId.value == 'shared_location');
@@ -92,7 +127,7 @@ class _MapScreenState extends State<MapScreen> {
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           infoWindow: InfoWindow(
             title: 'Shared Location',
-            snippet: sharedLoc.address,
+            snippet: _destinationName,
           ),
         ),
       );
@@ -422,6 +457,30 @@ class _MapScreenState extends State<MapScreen> {
     final LatLng destinationLatLng = LatLng(destination.latitude, destination.longitude);
     
     try {
+      // Get street address for the destination
+      String destinationAddress = destination.address;
+      try {
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          destination.latitude,
+          destination.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          Placemark place = placemarks.first;
+          final street = place.street ?? '';
+          final locality = place.locality ?? place.subLocality ?? place.administrativeArea ?? '';
+          
+          if (street.isNotEmpty && locality.isNotEmpty) {
+            destinationAddress = '$street, $locality';
+          } else if (locality.isNotEmpty) {
+            destinationAddress = locality;
+          } else if (street.isNotEmpty) {
+            destinationAddress = street;
+          }
+        }
+      } catch (e) {
+        // Use the provided address if geocoding fails
+      }
+      
       final directionsData = await _directionsService.getDirections(
         origin: _currentLocation,
         destination: destinationLatLng,
@@ -444,7 +503,7 @@ class _MapScreenState extends State<MapScreen> {
 
           _routeDistance = directionsData['distance'] as String?;
           _routeDuration = directionsData['duration'] as String?;
-          _destinationName = destination.address;
+          _destinationName = destinationAddress;
 
           _markers.removeWhere((marker) => marker.markerId.value == 'destination');
           _markers.add(
@@ -452,8 +511,8 @@ class _MapScreenState extends State<MapScreen> {
               markerId: const MarkerId('destination'),
               position: destinationLatLng,
               infoWindow: InfoWindow(
-                title: 'Seller Location',
-                snippet: destination.address,
+                title: 'Destination',
+                snippet: destinationAddress,
               ),
               icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
             ),
@@ -555,30 +614,29 @@ class _MapScreenState extends State<MapScreen> {
               child: Card(
                 elevation: 4,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Current Location
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              widget.activeTransaction!.productImage,
-                              width: 50,
-                              height: 50,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => 
-                                Container(
-                                  width: 50,
-                                  height: 50,
-                                  color: Colors.grey[300],
-                                  child: const Icon(Icons.image),
-                                ),
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF3864FF),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.my_location,
+                              color: Colors.white,
+                              size: 20,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -586,55 +644,77 @@ class _MapScreenState extends State<MapScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  widget.activeTransaction!.sellerName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                Text(
-                                  widget.activeTransaction!.productName,
+                                const Text(
+                                  'Current location',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.grey[600],
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.w500,
                                   ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _currentLocationName.isNotEmpty
+                                      ? _currentLocationName
+                                      : 'Getting location...',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
                           ),
                         ],
                       ),
-                      const Divider(height: 20),
                       
+                      const SizedBox(height: 16),
+                      
+                      // Destination
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.my_location, size: 16, color: Colors.blue),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _currentLocationName.isNotEmpty
-                                  ? _currentLocationName
-                                  : 'Current location',
-                              style: const TextStyle(fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF3864FF),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.location_on,
+                              color: Colors.white,
+                              size: 20,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on, size: 16, color: Colors.red),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 12),
                           Expanded(
-                            child: Text(
-                              _destinationName.isNotEmpty
-                                  ? _destinationName
-                                  : widget.activeTransaction!.sellerLocation!.address,
-                              style: const TextStyle(fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Destination',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _destinationName.isNotEmpty
+                                      ? _destinationName
+                                      : widget.activeTransaction!.sellerLocation!.address,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -642,28 +722,45 @@ class _MapScreenState extends State<MapScreen> {
                       
                       if (_routeDistance != null && _routeDuration != null)
                         Padding(
-                          padding: const EdgeInsets.only(top: 12),
+                          padding: const EdgeInsets.only(top: 16),
                           child: Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceAround,
                               children: [
                                 Row(
                                   children: [
-                                    const Icon(Icons.straighten, size: 16),
-                                    const SizedBox(width: 4),
-                                    Text(_routeDistance!, style: const TextStyle(fontSize: 12)),
+                                    const Icon(Icons.straighten, size: 18, color: Color(0xFF3864FF)),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _routeDistance!,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ],
+                                ),
+                                Container(
+                                  width: 1,
+                                  height: 20,
+                                  color: Colors.grey[300],
                                 ),
                                 Row(
                                   children: [
-                                    const Icon(Icons.access_time, size: 16),
-                                    const SizedBox(width: 4),
-                                    Text(_routeDuration!, style: const TextStyle(fontSize: 12)),
+                                    const Icon(Icons.access_time, size: 18, color: Color(0xFF3864FF)),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _routeDuration!,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ],
@@ -675,8 +772,8 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ),
             )
-          else if (widget.sharedLocation != null && SharedLocationState.sharedByUserName != null)
-            // Shared location info card (Messenger style)
+          else if (widget.sharedLocation != null && _destinationName.isNotEmpty)
+            // Shared location info card
             Positioned(
               top: 50,
               left: 16,
@@ -689,16 +786,24 @@ class _MapScreenState extends State<MapScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Current Location
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // User avatar
-                          CircleAvatar(
-                            radius: 24,
-                            backgroundImage: NetworkImage(
-                              SharedLocationState.sharedByUserAvatar ?? 
-                              'https://ui-avatars.com/api/?name=${Uri.encodeComponent(SharedLocationState.sharedByUserName!)}&background=random',
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF3864FF),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.my_location,
+                              color: Colors.white,
+                              size: 20,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -706,31 +811,119 @@ class _MapScreenState extends State<MapScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  '${SharedLocationState.sharedByUserName}\'s Location',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
+                                const Text(
+                                  'Current location',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
+                                Text(
+                                  _currentLocationName.isNotEmpty
+                                      ? _currentLocationName
+                                      : 'Getting location...',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Destination
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF3864FF),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.location_on,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Destination',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _destinationName,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      if (_routeDistance != null && _routeDuration != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
                                 Row(
                                   children: [
-                                    const Icon(
-                                      Icons.location_on,
-                                      size: 14,
-                                      color: Colors.red,
+                                    const Icon(Icons.straighten, size: 18, color: Color(0xFF3864FF)),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _routeDistance!,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        widget.sharedLocation!.address,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey[600],
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 2,
+                                  ],
+                                ),
+                                Container(
+                                  width: 1,
+                                  height: 20,
+                                  color: Colors.grey[300],
+                                ),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.access_time, size: 18, color: Color(0xFF3864FF)),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _routeDuration!,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ],
@@ -738,91 +931,14 @@ class _MapScreenState extends State<MapScreen> {
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                      const Divider(height: 20),
-                      // Coordinates
-                      Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Latitude',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                Text(
-                                  widget.sharedLocation!.latitude.toStringAsFixed(6),
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              width: 1,
-                              height: 30,
-                              color: Colors.grey[300],
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Longitude',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                Text(
-                                  widget.sharedLocation!.longitude.toStringAsFixed(6),
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // Get Directions button
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          // Draw route to this location
-                          await _drawRoute(widget.sharedLocation!);
-                        },
-                        icon: const Icon(Icons.directions, size: 20),
-                        label: const Text('Get Directions'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF3864FF),
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(double.infinity, 40),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
               ),
             )
           else
+            // Only current location (no destination)
             Positioned(
               top: 50,
               left: 16,
@@ -830,37 +946,50 @@ class _MapScreenState extends State<MapScreen> {
               child: Card(
                 elevation: 4,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Current Location',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                      ),
-                      const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
-                          borderRadius: BorderRadius.circular(8),
+                        width: 40,
+                        height: 40,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF3864FF),
+                          shape: BoxShape.circle,
                         ),
-                        child: Row(
+                        child: const Icon(
+                          Icons.my_location,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.location_on, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _currentLocationName.isNotEmpty
-                                    ? _currentLocationName
-                                    : 'Lat: ${_currentLocation.latitude.toStringAsFixed(4)}, Lng: ${_currentLocation.longitude.toStringAsFixed(4)}',
-                                style: const TextStyle(fontSize: 14),
-                                overflow: TextOverflow.ellipsis,
+                            const Text(
+                              'Current location',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                                fontWeight: FontWeight.w500,
                               ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _currentLocationName.isNotEmpty
+                                  ? _currentLocationName
+                                  : 'Getting location...',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),

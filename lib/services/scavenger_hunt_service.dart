@@ -89,4 +89,100 @@ class ScavengerHuntService {
           .toList();
     });
   }
+
+  // Admin: Create a new scavenger hunt item
+  Future<void> createScavengerHuntItem({
+    required String title,
+    required double price,
+    required String description,
+    required String imageUrl,
+    required double latitude,
+    required double longitude,
+    required int quantity,
+  }) async {
+    try {
+      await _firestore.collection('scavenger_hunt_items').add({
+        'title': title,
+        'price': price,
+        'description': description,
+        'imageUrl': imageUrl,
+        'latitude': latitude,
+        'longitude': longitude,
+        'quantity': quantity,
+        'isActive': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'claimedBy': null,
+        'claimedAt': null,
+      });
+
+      // Send notification to all users
+      await _notifyAllUsers(
+        'New Scavenger Hunt Item!',
+        'Find "$title" worth ₱${price.toStringAsFixed(0)} on the map!',
+      );
+    } catch (e) {
+      print('Error creating scavenger hunt item: $e');
+      rethrow;
+    }
+  }
+
+  // Admin: Get all items (including inactive)
+  Stream<List<ScavengerHuntItem>> getAllItems() {
+    return _firestore
+        .collection('scavenger_hunt_items')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => ScavengerHuntItem.fromMap(doc.id, doc.data()))
+          .toList();
+    });
+  }
+
+  // Admin: Toggle item active status
+  Future<void> toggleItemStatus(String itemId, bool isActive) async {
+    try {
+      await _firestore.collection('scavenger_hunt_items').doc(itemId).update({
+        'isActive': isActive,
+      });
+    } catch (e) {
+      print('Error toggling item status: $e');
+      rethrow;
+    }
+  }
+
+  // Admin: Delete an item
+  Future<void> deleteItem(String itemId) async {
+    try {
+      await _firestore.collection('scavenger_hunt_items').doc(itemId).delete();
+    } catch (e) {
+      print('Error deleting item: $e');
+      rethrow;
+    }
+  }
+
+  // Send notification to all users
+  Future<void> _notifyAllUsers(String title, String message) async {
+    try {
+      // Get all users
+      final usersSnapshot = await _firestore.collection('users').get();
+      
+      // Create notifications for all users
+      final batch = _firestore.batch();
+      for (final userDoc in usersSnapshot.docs) {
+        final notificationRef = _firestore.collection('notifications').doc();
+        batch.set(notificationRef, {
+          'userId': userDoc.id,
+          'title': title,
+          'message': message,
+          'type': 'scavenger_hunt',
+          'read': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+    } catch (e) {
+      print('Error sending notifications: $e');
+    }
+  }
 }

@@ -272,6 +272,18 @@ class _ListingScreenState extends State<ListingScreen> {
                     return const Center(child: Text('No listings available'));
                   }
 
+                  // Filter out sold items on client side
+                  final availableListings = snapshot.data!.docs
+                      .where((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        return data['isSold'] != true;
+                      })
+                      .toList();
+
+                  if (availableListings.isEmpty) {
+                    return const Center(child: Text('No listings available'));
+                  }
+
                   return GridView.builder(
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
@@ -279,9 +291,9 @@ class _ListingScreenState extends State<ListingScreen> {
                       mainAxisSpacing: 8,
                       childAspectRatio: 0.75,
                     ),
-                    itemCount: snapshot.data!.docs.length,
+                    itemCount: availableListings.length,
                     itemBuilder: (context, index) {
-                      final listing = snapshot.data!.docs[index];
+                      final listing = availableListings[index];
                       final data = listing.data() as Map<String, dynamic>;
                       return _buildListItem(
                         context,

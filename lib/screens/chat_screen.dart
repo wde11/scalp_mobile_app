@@ -5,7 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../models/location_data.dart';
 import '../globals.dart';
 
@@ -549,29 +550,32 @@ class _ChatScreenState extends State<ChatScreen> {
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
       
-      // Get address from coordinates
+      // Get address from coordinates using HTTP reverse geocoding API
       String address = 'Location shared';
       try {
-        final placemarks = await placemarkFromCoordinates(
-          position.latitude,
-          position.longitude,
+        // Use OpenStreetMap Nominatim API for reverse geocoding (free, no API key needed)
+        final url = Uri.parse(
+          'https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}'
         );
-        if (placemarks.isNotEmpty) {
-          final place = placemarks.first;
-          final street = place.street ?? '';
-          final locality = place.locality ?? place.subLocality ?? place.administrativeArea ?? '';
+        
+        final response = await http.get(url);
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final displayName = data['display_name'] as String?;
           
-          if (street.isNotEmpty && locality.isNotEmpty) {
-            address = '$street, $locality';
-          } else if (locality.isNotEmpty) {
-            address = locality;
-          } else if (street.isNotEmpty) {
-            address = street;
-          } else {
-            address = 'Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}';
+          if (displayName != null && displayName.isNotEmpty) {
+            // Extract a shorter, more readable address
+            final addressParts = displayName.split(',');
+            if (addressParts.length >= 2) {
+              // Take first 2-3 parts for a concise address
+              address = addressParts.take(3).join(',').trim();
+            } else {
+              address = displayName;
+            }
           }
         }
       } catch (e) {
+        print('Geocoding error: $e');
         address = 'Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}';
       }
       
@@ -598,6 +602,68 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error sharing location: $e')),
+        );
+      }
+    }
+  }
+  
+  Future<void> _stopSharingLocation(String messageId) async {
+    if (_selectedChatId == null) return;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.location_off, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Stop Sharing Location?'),
+          ],
+        ),
+        content: const Text(
+          'This will delete the location message. The recipient will no longer be able to see your shared location.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text(
+              'Stop Sharing',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed != true) return;
+    
+    try {
+      await _firestore
+          .collection('chats')
+          .doc(_selectedChatId)
+          .collection('messages')
+          .doc(messageId)
+          .delete();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location sharing stopped'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
         );
       }
     }
@@ -1201,7 +1267,9 @@ class _ChatScreenState extends State<ChatScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                           itemCount: messages.length,
                           itemBuilder: (context, index) {
-                            final message = messages[index].data() as Map<String, dynamic>;
+                            final messageDoc = messages[index];
+                            final message = messageDoc.data() as Map<String, dynamic>;
+                            final messageId = messageDoc.id;
                             final isMe = message['senderId'] == currentUser?.uid;
                             final text = message['text'] ?? '';
                             final imageUrl = message['imageUrl'];
@@ -1227,6 +1295,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                       isMe: isMe,
                                       avatar: avatarUrl,
                                       locationData: locationData,
+                                      messageId: messageId,
                                     ),
                                   if (itemInquiry != null)
                                     _messageItemInquiryRow(
@@ -1493,7 +1562,12 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
   
-  Widget _messageLocationRow({required bool isMe, required String avatar, required Map<String, dynamic> locationData}) {
+  Widget _messageLocationRow({
+    required bool isMe, 
+    required String avatar, 
+    required Map<String, dynamic> locationData,
+    required String messageId,
+  }) {
     final alignment = isMe ? MainAxisAlignment.end : MainAxisAlignment.start;
     final avatarWidget = CircleAvatar(radius: 16, backgroundImage: NetworkImage(avatar));
     final bubbleColor = isMe ? const Color(0xFF3864FF) : const Color(0xFF7B7D82);
@@ -1509,124 +1583,128 @@ class _ChatScreenState extends State<ChatScreen> {
         if (!isMe) avatarWidget,
         if (!isMe) const SizedBox(width: 8),
         Flexible(
-          child: GestureDetector(
-            onTap: () {
-              print('DEBUG: Location bubble tapped!');
-              if (latitude != null && longitude != null) {
-                print('DEBUG: Location data - Lat: $latitude, Lng: $longitude');
-                // Get sender name from the selected user
-                final senderName = isMe ? 'You' : (_selectedUserName ?? 'Unknown');
-                print('DEBUG: Sender name: $senderName');
-                // Navigate to map tab with the location
-                _navigateToMapWithLocation(
-                  latitude, 
-                  longitude, 
-                  address,
-                  userName: senderName,
-                  userAvatar: avatar,
-                );
-              } else {
-                print('DEBUG: Location data is null!');
-              }
-            },
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 250),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.3),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
+          child: Column(
+            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  if (latitude != null && longitude != null) {
+                    final senderName = isMe ? 'You' : (_selectedUserName ?? 'Unknown');
+                    _navigateToMapWithLocation(
+                      latitude, 
+                      longitude, 
+                      address,
+                      userName: senderName,
+                      userAvatar: avatar,
+                    );
+                  }
+                },
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 250),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: bubbleColor,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 6),
-                        const Flexible(
-                          child: Text(
-                            'Location Shared',
-                            style: TextStyle(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.location_on,
                               color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 6),
+                            const Flexible(
+                              child: Text(
+                                'Location Shared',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (address != null && address.isNotEmpty && address != 'Location shared') ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            address,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 12,
                             ),
                             overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (latitude != null && longitude != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Lat: ${latitude.toStringAsFixed(4)}, Lng: ${longitude.toStringAsFixed(4)}',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                    if (address != null && address.isNotEmpty && address != 'Location shared') ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        address,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 10,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 2,
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.touch_app,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Tap to view on map',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.95),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
+                            maxLines: 2,
                           ),
                         ],
-                      ),
-                    ),
-                  ],
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.touch_app,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Tap to view on map',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+              // Stop sharing button (only for sender)
+              if (isMe) ...[
+                const SizedBox(height: 6),
+                TextButton.icon(
+                  onPressed: () => _stopSharingLocation(messageId),
+                  icon: const Icon(Icons.location_off, size: 14, color: Colors.red),
+                  label: const Text(
+                    'Stop Sharing',
+                    style: TextStyle(fontSize: 11, color: Colors.red),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ],
           ),
+        ),
         if (isMe) const SizedBox(width: 8),
         if (isMe) avatarWidget,
       ],
