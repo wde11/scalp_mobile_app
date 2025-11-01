@@ -7,7 +7,7 @@ import 'package:scalp_mobile_app/screens/login_screen.dart';
 import 'package:scalp_mobile_app/screens/map_screen.dart';
 import 'package:scalp_mobile_app/screens/profile_screen.dart';
 import 'package:scalp_mobile_app/screens/signup_screen.dart';
-import 'package:scalp_mobile_app/screens/my_cart_screen.dart';
+import 'package:scalp_mobile_app/screens/my_wishlist_screen.dart';
 import 'package:scalp_mobile_app/screens/my_items_screen.dart';
 import 'package:scalp_mobile_app/screens/splash_screen.dart';
 
@@ -67,8 +67,8 @@ class AppRouter {
         builder: (context, state) => const ProfileScreen(),
       ),
       GoRoute(
-        path: '/my-cart',
-        builder: (context, state) => const MyCartScreen(),
+        path: '/my-wishlist',
+        builder: (context, state) => const MyWishlistScreen(),
       ),
       GoRoute(
         path: '/my-items',

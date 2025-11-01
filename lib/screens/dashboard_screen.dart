@@ -462,7 +462,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         'Items Bought',
                         _itemsBoughtCount.toString(),
                         'Updated just now',
-                        Icons.shopping_cart,
+                        Icons.favorite,
                       ),
                     ),
                     const SizedBox(width: 16),

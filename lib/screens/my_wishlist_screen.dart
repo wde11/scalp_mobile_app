@@ -3,32 +3,32 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 
-class MyCartScreen extends StatefulWidget {
-  const MyCartScreen({super.key});
+class MyWishlistScreen extends StatefulWidget {
+  const MyWishlistScreen({super.key});
 
   @override
-  State<MyCartScreen> createState() => _MyCartScreenState();
+  State<MyWishlistScreen> createState() => _MyWishlistScreenState();
 }
 
-class _MyCartScreenState extends State<MyCartScreen> {
+class _MyWishlistScreenState extends State<MyWishlistScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   User? get currentUser => _auth.currentUser;
 
-  Future<void> _removeCartItem(String listingId) async {
+  Future<void> _removeWishlistItem(String listingId) async {
     if (currentUser == null) return;
 
     try {
       await _firestore
-          .collection('carts')
+          .collection('wishlists')
           .doc(currentUser!.uid)
           .collection('items')
           .doc(listingId)
           .delete();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Item removed from cart')),
+          const SnackBar(content: Text('Item removed from wishlist')),
         );
       }
     } catch (e) {
@@ -101,20 +101,20 @@ class _MyCartScreenState extends State<MyCartScreen> {
   Widget build(BuildContext context) {
     if (currentUser == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('My Cart')),
+        appBar: AppBar(title: const Text('My Wishlist')),
         body: const Center(
-          child: Text('Please log in to view your cart.'),
+          child: Text('Please log in to view your wishlist.'),
         ),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Cart'),
+        title: const Text('My Wishlist'),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _firestore
-            .collection('carts')
+            .collection('wishlists')
             .doc(currentUser!.uid)
             .collection('items')
             .snapshots(),
@@ -128,18 +128,18 @@ class _MyCartScreenState extends State<MyCartScreen> {
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('Your cart is empty.'));
+            return const Center(child: Text('Your wishlist is empty.'));
           }
 
           return ListView.builder(
             itemCount: snapshot.data!.docs.length,
             itemBuilder: (context, index) {
-              final cartItem = snapshot.data!.docs[index];
-              final data = cartItem.data() as Map<String, dynamic>;
+              final wishlistItem = snapshot.data!.docs[index];
+              final data = wishlistItem.data() as Map<String, dynamic>;
               final title = data['title'] ?? 'No Title';
               final price = data['price']?.toString() ?? '0';
               final imageUrl = data['imageUrl'] ?? 'assets/images/placeholder.png';
-              final listingId = cartItem.id;
+              final listingId = wishlistItem.id;
               final sellerId = data['sellerId'];
 
               return Card(
@@ -210,7 +210,7 @@ class _MyCartScreenState extends State<MyCartScreen> {
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => _removeCartItem(listingId),
+                            onPressed: () => _removeWishlistItem(listingId),
                           ),
                         ],
                       ),

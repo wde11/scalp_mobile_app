@@ -231,9 +231,9 @@ class _ListingScreenState extends State<ListingScreen> {
                   children: [
                     ElevatedButton(
                       onPressed: () {
-                        context.push('/my-cart');
+                        context.push('/my-wishlist');
                       },
-                      child: const Text('My Cart'),
+                      child: const Text('My Wishlist'),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(
@@ -716,11 +716,11 @@ class _ListingDetailsModal extends StatelessWidget {
 
   _ListingDetailsModal({required this.listing});
 
-  Future<void> _addToCart(BuildContext context) async {
+  Future<void> _addToWishlist(BuildContext context) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in to add items to cart')),
+        const SnackBar(content: Text('Please sign in to add items to wishlist')),
       );
       return;
     }
@@ -734,29 +734,29 @@ class _ListingDetailsModal extends StatelessWidget {
 
     if (sellerId == currentUser.uid) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You cannot add your own listing to cart')),
+        const SnackBar(content: Text('You cannot add your own listing to wishlist')),
       );
       return;
     }
 
     try {
-      // Check if the item is already in the cart
-      final cartItem = await _firestore
-          .collection('carts')
+      // Check if the item is already in the wishlist
+      final wishlistItem = await _firestore
+          .collection('wishlists')
           .doc(currentUser.uid)
           .collection('items')
           .doc(listingId)
           .get();
 
-      if (cartItem.exists) {
+      if (wishlistItem.exists) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Item already in cart')),
+          const SnackBar(content: Text('Item already in wishlist')),
         );
         return;
       }
 
       await _firestore
-          .collection('carts')
+          .collection('wishlists')
           .doc(currentUser.uid)
           .collection('items')
           .doc(listingId)
@@ -771,11 +771,11 @@ class _ListingDetailsModal extends StatelessWidget {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$title added to cart!')),
+        SnackBar(content: Text('$title added to wishlist!')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding to cart: $e')),
+        SnackBar(content: Text('Error adding to wishlist: $e')),
       );
     }
   }
@@ -1105,9 +1105,9 @@ class _ListingDetailsModal extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => _addToCart(context),
-                      icon: const Icon(Icons.shopping_cart),
-                      label: const Text('Add to Cart'),
+                      onPressed: () => _addToWishlist(context),
+                      icon: const Icon(Icons.favorite_border),
+                      label: const Text('Add to Wishlist'),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),

@@ -14,12 +14,12 @@ service cloud.firestore {
       );
     }
 
-    // Carts collection
-    match /carts/{userId} {
+    // Wishlists collection
+    match /wishlists/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      // Items subcollection within a user's cart
-      match /items/{cartItemId} {
+      // Items subcollection within a user's wishlist
+      match /items/{wishlistItemId} {
         allow read, create, update, delete: if request.auth != null && request.auth.uid == userId;
       }
     }
