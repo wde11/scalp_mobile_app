@@ -227,29 +227,47 @@ class _ListingScreenState extends State<ListingScreen> {
                   'Recent',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                Row(
-                  children: [
-                    ElevatedButton(
-                      onPressed: () {
-                        context.push('/my-wishlist');
-                      },
-                      child: const Text('My Wishlist'),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        context.push('/my-items');
-                      },
-                      child: const Text('My Items'),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        // TODO: Implement filter logic
-                      },
-                      child: const Text('Filter'),
-                    ),
-                  ],
+                Flexible(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Flexible(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            context.push('/my-wishlist');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          child: const Text('Wishlist', style: TextStyle(fontSize: 12)),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            context.push('/my-items');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          child: const Text('My Items', style: TextStyle(fontSize: 12)),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // TODO: Implement filter logic
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          child: const Text('Filter', style: TextStyle(fontSize: 12)),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
