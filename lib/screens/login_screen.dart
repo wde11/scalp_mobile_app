@@ -68,8 +68,11 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = true;
       });
 
+      print('Starting Google Sign-In...');
+
       if (kIsWeb) {
         // Web platform - use popup
+        print('Using web sign-in method');
         final googleProvider = GoogleAuthProvider()
           ..addScope('email')
           ..addScope('https://www.googleapis.com/auth/userinfo.profile');
@@ -80,6 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } else {
         // Android/iOS platform - use google_sign_in package
+        print('Using Android/iOS sign-in method');
         final GoogleSignIn googleSignIn = GoogleSignIn(
           scopes: [
             'email',
@@ -87,30 +91,49 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         );
 
+        print('Attempting to sign in...');
         final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
 
         if (googleUser == null) {
           // User cancelled the sign-in
+          print('User cancelled sign-in');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Sign-in cancelled')),
+            );
+          }
           return;
         }
 
+        print('Google user obtained: ${googleUser.email}');
+        print('Getting authentication...');
         final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+        print('Got authentication - accessToken: ${googleAuth.accessToken != null}, idToken: ${googleAuth.idToken != null}');
 
         final credential = GoogleAuthProvider.credential(
           accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
         );
 
+        print('Signing in with credential...');
         final userCredential = await _auth.signInWithCredential(credential);
+        print('Sign-in successful! User: ${userCredential.user?.email}');
+        
         if (mounted && userCredential.user != null) {
           await _ensureUserDocument(userCredential.user!);
+          print('User document created/updated');
           context.go('/');
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('ERROR in _signInWithGoogle: $e');
+      print('Stack trace: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to sign in with Google: ${e.toString()}')),
+          SnackBar(
+            content: Text('Failed to sign in with Google: ${e.toString()}'),
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     } finally {
