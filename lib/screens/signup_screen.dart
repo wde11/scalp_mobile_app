@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
   @override
-  _SignupScreenState createState() => _SignupScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
 class _SignupScreenState extends State<SignupScreen> {
@@ -27,23 +28,31 @@ class _SignupScreenState extends State<SignupScreen> {
       });
 
       try {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        // Create user account
+        final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
 
-        // Here you could add user details to Firestore or Realtime Database
-        // For example:
-        // User? user = FirebaseAuth.instance.currentUser;
-        // if (user != null) {
-        //   await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        //     'firstName': _fullNameController.text.trim(),
-        //     'lastName': _lastNameController.text.trim(),
-        //     'email': _emailController.text.trim(),
-        //     'birthDate': _birthDateController.text.trim(),
-        //     'phoneNumber': _phoneNumberController.text.trim(),
-        //   });
-        // }
+        // Save user details to Firestore
+        final user = userCredential.user;
+        if (user != null) {
+          final fullName = '${_fullNameController.text.trim()} ${_lastNameController.text.trim()}';
+          final username = _emailController.text.trim().split('@')[0].toLowerCase();
+          
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+            'firstName': _fullNameController.text.trim(),
+            'lastName': _lastNameController.text.trim(),
+            'name': fullName,
+            'username': username,
+            'email': _emailController.text.trim(),
+            'birthDate': _birthDateController.text.trim(),
+            'phone': _phoneNumberController.text.trim(),
+            'profilePicture': '',
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -68,7 +77,7 @@ class _SignupScreenState extends State<SignupScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('An unexpected error occurred.')),
+            SnackBar(content: Text('An unexpected error occurred: $e')),
           );
         }
       } finally {

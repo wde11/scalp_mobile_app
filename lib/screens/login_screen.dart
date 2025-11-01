@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../widgets/logo_placeholder.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -17,6 +20,130 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = false;
   bool _isPasswordVisible = false;
   bool _isLoading = false;
+  
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Ensure user document exists in Firestore
+  Future<void> _ensureUserDocument(User user) async {
+    try {
+      final displayName = user.displayName ?? user.email?.split('@')[0] ?? 'User';
+      final username = user.email?.split('@')[0].toLowerCase() ?? user.uid.substring(0, 8);
+      
+      // Use set with merge to create or update the document
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .set({
+        'name': displayName,
+        'username': username,
+        'email': user.email ?? '',
+        'profilePicture': user.photoURL ?? '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      
+      // Also set createdAt if it's a new document
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      if (userDoc.data()?['createdAt'] == null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      print('Error ensuring user document: $e');
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    if (_isLoading) return;
+
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      print('Starting Google Sign-In...');
+
+      if (kIsWeb) {
+        // Web platform - use popup
+        print('Using web sign-in method');
+        final googleProvider = GoogleAuthProvider()
+          ..addScope('email')
+          ..addScope('https://www.googleapis.com/auth/userinfo.profile');
+        final userCredential = await _auth.signInWithPopup(googleProvider);
+        if (mounted && userCredential.user != null) {
+          await _ensureUserDocument(userCredential.user!);
+          context.go('/');
+        }
+      } else {
+        // Android/iOS platform - use google_sign_in package
+        print('Using Android/iOS sign-in method');
+        final GoogleSignIn googleSignIn = GoogleSignIn(
+          scopes: [
+            'email',
+            'https://www.googleapis.com/auth/userinfo.profile',
+          ],
+        );
+
+        print('Attempting to sign in...');
+        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+        if (googleUser == null) {
+          // User cancelled the sign-in
+          print('User cancelled sign-in');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Sign-in cancelled')),
+            );
+          }
+          return;
+        }
+
+        print('Google user obtained: ${googleUser.email}');
+        print('Getting authentication...');
+        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+        print('Got authentication - accessToken: ${googleAuth.accessToken != null}, idToken: ${googleAuth.idToken != null}');
+
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        print('Signing in with credential...');
+        final userCredential = await _auth.signInWithCredential(credential);
+        print('Sign-in successful! User: ${userCredential.user?.email}');
+        
+        if (mounted && userCredential.user != null) {
+          await _ensureUserDocument(userCredential.user!);
+          print('User document created/updated');
+          context.go('/');
+        }
+      }
+    } catch (e, stackTrace) {
+      print('ERROR in _signInWithGoogle: $e');
+      print('Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to sign in with Google: ${e.toString()}'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   void _login() async {
     if (_formKey.currentState!.validate()) {
@@ -43,9 +170,9 @@ class _LoginScreenState extends State<LoginScreen> {
           message = 'An error occurred during login.';
         }
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(message)));
         }
       } catch (e) {
         if (mounted) {
@@ -197,11 +324,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                       ),
                       const SizedBox(height: 24.0),
+                      // Google Sign-In available on all platforms
                       Row(
                         children: <Widget>[
                           const Expanded(child: Divider()),
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8.0,
+                            ),
                             child: Text(
                               "Or continue with",
                               style: TextStyle(color: Colors.grey[600]),
@@ -211,21 +341,33 @@ class _LoginScreenState extends State<LoginScreen> {
                         ],
                       ),
                       const SizedBox(height: 24.0),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          // TODO: Implement Google Sign-In
-                        },
-                        icon: Image.asset('assets/images/google_logo.png', height: 24.0), // Make sure to add google_logo.png in assets
-                        label: const Text('Sign in with Google'),
-                        style: ElevatedButton.styleFrom(
-                          foregroundColor: Colors.black, backgroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12.0),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                            side: BorderSide(color: Colors.grey[300]!),
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _signInWithGoogle,
+                        child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image.asset(
+                                'assets/images/google_logo.png',
+                                height: 24.0,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Icon(Icons.g_mobiledata, size: 24);
+                                },
+                              ),
+                              const SizedBox(width: 12),
+                              const Text('Sign in with Google'),
+                            ],
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            foregroundColor: Colors.black,
+                            backgroundColor: Colors.white,
+                            padding: const EdgeInsets.all(12.0),
+                            minimumSize: const Size(double.infinity, 48),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8.0),
+                              side: BorderSide(color: Colors.grey[300]!),
+                            ),
                           ),
                         ),
-                      ),
                       const SizedBox(height: 32.0),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
