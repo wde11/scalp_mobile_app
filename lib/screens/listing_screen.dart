@@ -736,7 +736,13 @@ class _ListingDetailsModal extends StatelessWidget {
 
   Future<void> _addToWishlist(BuildContext context) async {
     final currentUser = _auth.currentUser;
+    
+    print('=== ADD TO WISHLIST DEBUG ===');
+    print('Current user: ${currentUser?.uid}');
+    print('User email: ${currentUser?.email}');
+    
     if (currentUser == null) {
+      print('ERROR: User is not authenticated');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please sign in to add items to wishlist')),
       );
@@ -750,7 +756,12 @@ class _ListingDetailsModal extends StatelessWidget {
     final imageUrl = data['imageUrl'] ?? 'assets/images/placeholder.png';
     final sellerId = data['userId'];
 
+    print('Listing ID: $listingId');
+    print('Seller ID: $sellerId');
+    print('Wishlist path: wishlists/${currentUser.uid}/items/$listingId');
+
     if (sellerId == currentUser.uid) {
+      print('ERROR: Cannot add own listing');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You cannot add your own listing to wishlist')),
       );
@@ -758,6 +769,7 @@ class _ListingDetailsModal extends StatelessWidget {
     }
 
     try {
+      print('Checking if item already in wishlist...');
       // Check if the item is already in the wishlist
       final wishlistItem = await _firestore
           .collection('wishlists')
@@ -767,12 +779,14 @@ class _ListingDetailsModal extends StatelessWidget {
           .get();
 
       if (wishlistItem.exists) {
+        print('Item already in wishlist');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Item already in wishlist')),
         );
         return;
       }
 
+      print('Adding item to wishlist...');
       await _firestore
           .collection('wishlists')
           .doc(currentUser.uid)
@@ -788,10 +802,12 @@ class _ListingDetailsModal extends StatelessWidget {
         'addedAt': FieldValue.serverTimestamp(),
       });
 
+      print('SUCCESS: Item added to wishlist');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('$title added to wishlist!')),
       );
     } catch (e) {
+      print('ERROR adding to wishlist: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error adding to wishlist: $e')),
       );

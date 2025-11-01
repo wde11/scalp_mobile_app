@@ -100,6 +100,7 @@ class _MyWishlistScreenState extends State<MyWishlistScreen> {
   @override
   Widget build(BuildContext context) {
     if (currentUser == null) {
+      print('Wishlist: User not authenticated');
       return Scaffold(
         appBar: AppBar(title: const Text('My Wishlist')),
         body: const Center(
@@ -107,6 +108,9 @@ class _MyWishlistScreenState extends State<MyWishlistScreen> {
         ),
       );
     }
+
+    print('Wishlist: Loading for user ${currentUser!.uid}');
+    print('Wishlist path: wishlists/${currentUser!.uid}/items');
 
     return Scaffold(
       appBar: AppBar(
@@ -120,6 +124,7 @@ class _MyWishlistScreenState extends State<MyWishlistScreen> {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
+            print('Wishlist ERROR: ${snapshot.error}');
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
@@ -128,9 +133,11 @@ class _MyWishlistScreenState extends State<MyWishlistScreen> {
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            print('Wishlist: Empty or no data');
             return const Center(child: Text('Your wishlist is empty.'));
           }
 
+          print('Wishlist: Found ${snapshot.data!.docs.length} items');
           return ListView.builder(
             itemCount: snapshot.data!.docs.length,
             itemBuilder: (context, index) {
