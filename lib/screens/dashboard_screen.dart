@@ -1512,12 +1512,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                               ],
                             ),
                             trailing: SizedBox(
-                              width: 110,
+                              width: 95,
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
                                   Transform.scale(
-                                    scale: 0.75,
+                                    scale: 0.7,
                                     child: Switch(
                                       value: item.isActive,
                                       onChanged: (value) async {
@@ -1545,10 +1546,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       },
                                     ),
                                   ),
+                                  const SizedBox(width: 4),
                                   IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                                    icon: const Icon(Icons.delete, color: Colors.red, size: 18),
                                     padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                     onPressed: () async {
                                     final confirmed = await showDialog<bool>(
                                       context: context,
@@ -1891,20 +1893,29 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 14,
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              color: Colors.grey[700],
-              fontSize: 14,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontSize: 14,
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
             ),
           ),
         ],
