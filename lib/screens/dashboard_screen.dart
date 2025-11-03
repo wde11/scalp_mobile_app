@@ -1512,13 +1512,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                               ],
                             ),
                             trailing: SizedBox(
-                              width: 90,
+                              width: 80,
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
                                   Transform.scale(
-                                    scale: 0.65,
+                                    scale: 0.6,
                                     child: Switch(
                                       value: item.isActive,
                                       onChanged: (value) async {
@@ -1546,11 +1546,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       },
                                     ),
                                   ),
-                                  const SizedBox(width: 2),
                                   IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red, size: 17),
+                                    icon: const Icon(Icons.delete, color: Colors.red, size: 16),
                                     padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                                     onPressed: () async {
                                     final confirmed = await showDialog<bool>(
                                       context: context,
