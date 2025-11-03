@@ -917,7 +917,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           'Scavenger Hunt',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                           maxLines: 1,
@@ -927,7 +927,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           'Manage treasure items',
                           style: TextStyle(
                             color: Colors.white70,
-                            fontSize: 12,
+                            fontSize: 11,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
