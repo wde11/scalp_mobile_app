@@ -102,12 +102,20 @@ class ScavengerHuntService {
     int? eventDurationMinutes,
   }) async {
     try {
+      print('=== CREATING SCAVENGER HUNT ITEM ===');
+      print('Title: $title');
+      print('Price: $price');
+      print('Quantity: $quantity');
+      print('Event Duration: $eventDurationMinutes minutes');
+      
       final now = DateTime.now();
       final eventEndTime = eventDurationMinutes != null 
           ? now.add(Duration(minutes: eventDurationMinutes))
           : null;
       
-      await _firestore.collection('scavenger_hunt_items').add({
+      print('Event End Time: $eventEndTime');
+      
+      final docRef = await _firestore.collection('scavenger_hunt_items').add({
         'title': title,
         'price': price,
         'description': description,
@@ -122,11 +130,15 @@ class ScavengerHuntService {
         'eventEndTime': eventEndTime,
       });
 
+      print('Item created with ID: ${docRef.id}');
+
       // Send notification to all users
       await _notifyAllUsers(
         'New Scavenger Hunt Item!',
         'Find "$title" worth ₱${price.toStringAsFixed(0)} on the map!',
       );
+      
+      print('Notifications sent to all users');
     } catch (e) {
       print('Error creating scavenger hunt item: $e');
       rethrow;
@@ -140,9 +152,16 @@ class ScavengerHuntService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => ScavengerHuntItem.fromMap(doc.id, doc.data()))
+      print('=== SCAVENGER HUNT DEBUG ===');
+      print('Total items retrieved: ${snapshot.docs.length}');
+      final items = snapshot.docs
+          .map((doc) {
+            print('Item: ${doc.id} - ${doc.data()['title']}');
+            return ScavengerHuntItem.fromMap(doc.id, doc.data());
+          })
           .toList();
+      print('Items mapped: ${items.length}');
+      return items;
     });
   }
 

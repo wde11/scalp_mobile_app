@@ -77,11 +77,40 @@ service cloud.firestore {
       // Authenticated users can read all scavenger hunt items
       allow read: if request.auth != null;
       
-      // Only authenticated users can claim/update items
-      allow update: if request.auth != null;
+      // Only authenticated users can create scavenger hunt items
+      // Validates required fields
+      allow create: if request.auth != null &&
+                       request.resource.data.keys().hasAll(['title', 'price', 'description', 'imageUrl', 
+                                                            'latitude', 'longitude', 'quantity', 'isActive', 'createdAt']) &&
+                       request.resource.data.title is string &&
+                       request.resource.data.title.size() > 0 &&
+                       request.resource.data.price is number &&
+                       request.resource.data.price >= 0 &&
+                       request.resource.data.quantity is int &&
+                       request.resource.data.quantity > 0 &&
+                       request.resource.data.isActive is bool &&
+                       request.resource.data.latitude is number &&
+                       request.resource.data.longitude is number;
       
-      // Only authenticated users can create items
-      allow create: if request.auth != null;
+      // Users can update items for:
+      // 1. Claiming an item (setting claimedBy and claimedAt)
+      // 2. Toggling active status (admin-like function)
+      allow update: if request.auth != null && (
+        // Claiming an item: can only claim if not already claimed and item is active
+        (resource.data.claimedBy == null && 
+         resource.data.isActive == true &&
+         request.resource.data.claimedBy == request.auth.uid &&
+         request.resource.data.keys().hasAll(['claimedBy', 'claimedAt']) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimedBy', 'claimedAt'])) ||
+        
+        // Toggling active status or updating item details
+        // (In production, you might want to restrict this to admin users only)
+        (request.resource.data.diff(resource.data).affectedKeys().hasAny(['isActive', 'title', 'description', 'price', 'quantity', 'eventEndTime']))
+      );
+      
+      // Allow deletion (typically for admins/creators)
+      // In production, you might want to add admin role checking here
+      allow delete: if request.auth != null;
     }
     
     // Transactions collection
