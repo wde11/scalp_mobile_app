@@ -27,7 +27,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final ScavengerHuntService _scavengerHuntService = ScavengerHuntService();
-  final cloudinary = CloudinaryPublic('dk6k4xkqw', 'ml_default', cache: false);
+  final cloudinary = CloudinaryPublic('dp5mqhd9w', 'scalp_preset', cache: false);
   
   int _itemsSoldCount = 0;
   int _wishlistItemsCount = 0;
@@ -1276,13 +1276,22 @@ class _DashboardScreenState extends State<DashboardScreen>
                   return;
                 }
 
-                // Show loading
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Creating scavenger hunt item...')),
-                );
+                // Save context reference before async gap
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
 
                 try {
+                  // Close dialog first
+                  navigator.pop();
+                  
+                  // Show loading message
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Creating scavenger hunt item...'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+
                   String imageUrl = 'https://via.placeholder.com/400x300?text=Scavenger+Hunt';
 
                   // Upload image if selected
@@ -1306,16 +1315,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                       }
                       final response = await cloudinary.uploadFile(cloudinaryFile);
                       imageUrl = response.secureUrl;
+                      print('Image uploaded successfully: $imageUrl');
                     } catch (uploadError) {
                       print('Image upload failed: $uploadError');
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Image upload failed. Using placeholder.'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      }
+                      // Continue with placeholder - don't fail the whole operation
                     }
                   }
 
@@ -1330,20 +1333,22 @@ class _DashboardScreenState extends State<DashboardScreen>
                     eventDurationMinutes: int.tryParse(eventDurationController.text),
                   );
 
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Scavenger hunt item created! All users notified.'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Scavenger hunt item created successfully!'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e')),
-                    );
-                  }
+                  print('Error creating scavenger hunt item: $e');
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
                 }
               },
               style: ElevatedButton.styleFrom(
