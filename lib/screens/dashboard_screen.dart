@@ -1436,12 +1436,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                           child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                             onTap: () => _showScavengerHuntItemDetailsDialog(context, item),
                             leading: item.imageUrl.isNotEmpty
                                 ? Container(
-                                    width: 56,
-                                    height: 56,
+                                    width: 50,
+                                    height: 50,
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(8),
                                       image: DecorationImage(
@@ -1451,13 +1451,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     ),
                                   )
                                 : Container(
-                                    width: 56,
-                                    height: 56,
+                                    width: 50,
+                                    height: 50,
                                     decoration: BoxDecoration(
                                       color: Colors.grey[300],
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Icon(Icons.card_giftcard, size: 28),
+                                    child: const Icon(Icons.card_giftcard, size: 26),
                                   ),
                             title: Text(
                               item.title,
