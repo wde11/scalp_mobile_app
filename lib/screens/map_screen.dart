@@ -66,7 +66,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _loadScavengerHuntItems() {
-    _scavengerHuntService.getActiveItems().listen((items) {
+    // Load ALL items (not just active ones) so users can see all scavenger hunt items
+    _scavengerHuntService.getAllItems().listen((items) {
       if (mounted) {
         setState(() {
           _scavengerHuntItems = items;
@@ -149,19 +150,32 @@ class _MapScreenState extends State<MapScreen> {
     _markers.removeWhere((marker) => 
       marker.markerId.value.startsWith('scavenger_'));
 
-    // Add new scavenger hunt markers
+    // Add new scavenger hunt markers for ALL items (active and inactive)
     for (var item in _scavengerHuntItems) {
       final isClaimedByMe = _scavengerHuntService.isClaimedByCurrentUser(item);
       final isClaimed = item.isClaimed;
+      final isEventActive = item.isEventActive;
       
       // Determine marker color based on status
       BitmapDescriptor markerIcon;
-      if (isClaimedByMe) {
+      String statusText;
+      
+      if (!isEventActive) {
+        // Event ended - grey marker
+        markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet);
+        statusText = "Event Ended";
+      } else if (isClaimedByMe) {
+        // Claimed by current user - green marker
         markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+        statusText = "Your Claim";
       } else if (isClaimed) {
+        // Claimed by someone else - red marker
         markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+        statusText = "Taken";
       } else {
+        // Available - orange marker
         markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
+        statusText = "Available";
       }
 
       _markers.add(
@@ -171,7 +185,7 @@ class _MapScreenState extends State<MapScreen> {
           icon: markerIcon,
           infoWindow: InfoWindow(
             title: item.title,
-            snippet: '₱${item.price.toStringAsFixed(0)} - ${isClaimed ? "Claimed" : "Available"}',
+            snippet: '₱${item.price.toStringAsFixed(0)} - $statusText',
           ),
           onTap: () => _showScavengerHuntItemDetails(item),
         ),
@@ -521,8 +535,9 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _showMyScavengerHuntItems() {
-    final myItems = _scavengerHuntItems.where((item) => 
-      _scavengerHuntService.isClaimedByCurrentUser(item)
+    // Show all active scavenger hunt items with countdown timers
+    final activeItems = _scavengerHuntItems.where((item) => 
+      item.isActive && item.isEventActive
     ).toList();
 
     showModalBottomSheet(
@@ -532,7 +547,7 @@ class _MapScreenState extends State<MapScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
+        initialChildSize: 0.7,
         minChildSize: 0.4,
         maxChildSize: 0.9,
         expand: false,
@@ -542,7 +557,11 @@ class _MapScreenState extends State<MapScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                gradient: LinearGradient(
+                  colors: [Colors.orange.shade400, Colors.deepOrange.shade500],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Column(
@@ -553,7 +572,7 @@ class _MapScreenState extends State<MapScreen> {
                     height: 4,
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: Colors.white.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -562,19 +581,32 @@ class _MapScreenState extends State<MapScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.orange,
+                          color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(Icons.card_giftcard, color: Colors.white, size: 24),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'My Scavenger Hunt Items',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Active Scavenger Hunt',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              '${activeItems.length} items available',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.white.withOpacity(0.9),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -585,7 +617,7 @@ class _MapScreenState extends State<MapScreen> {
             
             // Content
             Expanded(
-              child: myItems.isEmpty
+              child: activeItems.isEmpty
                   ? Center(
                       child: Padding(
                         padding: const EdgeInsets.all(32.0),
@@ -599,7 +631,7 @@ class _MapScreenState extends State<MapScreen> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'No Items Claimed Yet',
+                              'No Active Items',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -608,7 +640,7 @@ class _MapScreenState extends State<MapScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Start exploring and claim items\nto see them here!',
+                              'Check back later for new\nscavenger hunt items!',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 14,
@@ -622,9 +654,12 @@ class _MapScreenState extends State<MapScreen> {
                   : ListView.builder(
                       controller: scrollController,
                       padding: const EdgeInsets.all(16),
-                      itemCount: myItems.length,
+                      itemCount: activeItems.length,
                       itemBuilder: (context, index) {
-                        final item = myItems[index];
+                        final item = activeItems[index];
+                        final isClaimedByMe = _scavengerHuntService.isClaimedByCurrentUser(item);
+                        final timeRemaining = item.timeRemaining;
+                        
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           elevation: 2,
@@ -689,7 +724,7 @@ class _MapScreenState extends State<MapScreen> {
                                             fontWeight: FontWeight.bold,
                                             fontSize: 16,
                                           ),
-                                          maxLines: 2,
+                                          maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         const SizedBox(height: 4),
@@ -708,19 +743,40 @@ class _MapScreenState extends State<MapScreen> {
                                           ],
                                         ),
                                         const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'Claimed ${_formatDate(item.claimedAt ?? item.createdAt)}',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[600],
-                                              ),
+                                        // Countdown Timer
+                                        if (timeRemaining != null)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: timeRemaining.inMinutes < 30 
+                                                  ? Colors.red[100] 
+                                                  : Colors.blue[100],
+                                              borderRadius: BorderRadius.circular(12),
                                             ),
-                                          ],
-                                        ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.timer,
+                                                  size: 14,
+                                                  color: timeRemaining.inMinutes < 30 
+                                                      ? Colors.red[700] 
+                                                      : Colors.blue[700],
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  _formatDuration(timeRemaining),
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: timeRemaining.inMinutes < 30 
+                                                        ? Colors.red[700] 
+                                                        : Colors.blue[700],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   ),
@@ -729,20 +785,44 @@ class _MapScreenState extends State<MapScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: Colors.green[100],
+                                      color: isClaimedByMe 
+                                          ? Colors.green[100]
+                                          : item.isClaimed 
+                                              ? Colors.red[100]
+                                              : Colors.orange[100],
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.check_circle, size: 14, color: Colors.green[700]),
+                                        Icon(
+                                          isClaimedByMe 
+                                              ? Icons.check_circle 
+                                              : item.isClaimed 
+                                                  ? Icons.cancel 
+                                                  : Icons.card_giftcard,
+                                          size: 14,
+                                          color: isClaimedByMe 
+                                              ? Colors.green[700]
+                                              : item.isClaimed 
+                                                  ? Colors.red[700]
+                                                  : Colors.orange[700],
+                                        ),
                                         const SizedBox(width: 4),
                                         Text(
-                                          'Yours',
+                                          isClaimedByMe 
+                                              ? 'Yours'
+                                              : item.isClaimed 
+                                                  ? 'Taken'
+                                                  : 'Open',
                                           style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.green[700],
+                                            color: isClaimedByMe 
+                                                ? Colors.green[700]
+                                                : item.isClaimed 
+                                                    ? Colors.red[700]
+                                                    : Colors.orange[700],
                                           ),
                                         ),
                                       ],
@@ -1427,7 +1507,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
 
-          // Scavenger hunt legend and my items button
+          // Scavenger hunt legend and active items button
           if (_showScavengerHunt && _scavengerHuntItems.isNotEmpty)
             Positioned(
               bottom: 220,
@@ -1435,7 +1515,7 @@ class _MapScreenState extends State<MapScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // My Items Button
+                  // Active Items Button
                   Material(
                     elevation: 4,
                     borderRadius: BorderRadius.circular(12),
@@ -1455,10 +1535,10 @@ class _MapScreenState extends State<MapScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.card_giftcard, color: Colors.white, size: 20),
+                            const Icon(Icons.list_alt, color: Colors.white, size: 20),
                             const SizedBox(width: 8),
                             const Text(
-                              'My Items',
+                              'Active Items',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -1489,20 +1569,28 @@ class _MapScreenState extends State<MapScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
-                          'Legend',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: Colors.black87,
-                          ),
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline, size: 16, color: Colors.grey[700]),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Item Status',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 10),
-                        _legendItem(Colors.orange, 'Available'),
+                        _legendItem(Colors.orange, 'Available', 'Ready to claim'),
                         const SizedBox(height: 6),
-                        _legendItem(Colors.green, 'Your Claims'),
+                        _legendItem(Colors.green, 'Your Claims', 'Items you claimed'),
                         const SizedBox(height: 6),
-                        _legendItem(Colors.red, 'Claimed'),
+                        _legendItem(Colors.red, 'Taken', 'Claimed by others'),
+                        const SizedBox(height: 6),
+                        _legendItem(Colors.grey, 'Ended', 'Event expired'),
                       ],
                     ),
                   ),
@@ -1601,15 +1689,33 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _legendItem(Color color, String label) {
+  Widget _legendItem(Color color, String label, [String? description]) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(Icons.location_on, color: color, size: 16),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 10),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (description != null)
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: Colors.grey[600],
+                  ),
+                ),
+            ],
+          ),
         ),
       ],
     );
