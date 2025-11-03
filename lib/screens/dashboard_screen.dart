@@ -1436,7 +1436,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                           child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                             onTap: () => _showScavengerHuntItemDetailsDialog(context, item),
                             leading: item.imageUrl.isNotEmpty
                                 ? Container(
@@ -1512,13 +1512,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                               ],
                             ),
                             trailing: SizedBox(
-                              width: 80,
+                              width: 75,
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
                                   Transform.scale(
-                                    scale: 0.6,
+                                    scale: 0.55,
                                     child: Switch(
                                       value: item.isActive,
                                       onChanged: (value) async {
@@ -1547,9 +1547,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     ),
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red, size: 16),
+                                    icon: const Icon(Icons.delete, color: Colors.red, size: 15),
                                     padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                    constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
                                     onPressed: () async {
                                     final confirmed = await showDialog<bool>(
                                       context: context,
