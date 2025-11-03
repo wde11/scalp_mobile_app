@@ -30,7 +30,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   final cloudinary = CloudinaryPublic('dk6k4xkqw', 'ml_default', cache: false);
   
   int _itemsSoldCount = 0;
-  int _itemsBoughtCount = 0;
+  int _wishlistItemsCount = 0;
   
   User? get currentUser => _auth.currentUser;
 
@@ -60,17 +60,17 @@ class _DashboardScreenState extends State<DashboardScreen>
           .where('isSold', isEqualTo: true)
           .get();
       
-      // Count bought items (transactions where user is the buyer and completed)
-      final boughtSnapshot = await _firestore
-          .collection('transactions')
-          .where('buyerId', isEqualTo: currentUser!.uid)
-          .where('status', isEqualTo: 'completed')
+      // Count wishlist items
+      final wishlistSnapshot = await _firestore
+          .collection('wishlists')
+          .doc(currentUser!.uid)
+          .collection('items')
           .get();
       
       if (mounted) {
         setState(() {
           _itemsSoldCount = soldSnapshot.docs.length;
-          _itemsBoughtCount = boughtSnapshot.docs.length;
+          _wishlistItemsCount = wishlistSnapshot.docs.length;
         });
       }
     } catch (e) {
@@ -225,7 +225,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
   
-  void _showBoughtItemsDialog(BuildContext context) {
+  void _showWishlistItemsDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -239,7 +239,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Items Bought',
+                      'My Wishlist',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -257,9 +257,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                 child: StreamBuilder<QuerySnapshot>(
                   stream: currentUser != null
                       ? _firestore
-                          .collection('transactions')
-                          .where('buyerId', isEqualTo: currentUser!.uid)
-                          .where('status', isEqualTo: 'completed')
+                          .collection('wishlists')
+                          .doc(currentUser!.uid)
+                          .collection('items')
                           .snapshots()
                       : null,
                   builder: (context, snapshot) {
@@ -272,7 +272,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         child: Padding(
                           padding: const EdgeInsets.all(24.0),
                           child: Text(
-                            'Error loading bought items: ${snapshot.error}',
+                            'Error loading wishlist: ${snapshot.error}',
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.red),
                           ),
@@ -285,7 +285,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         child: Padding(
                           padding: EdgeInsets.all(24.0),
                           child: Text(
-                            'No purchases yet.\nBuy items to see them here!',
+                            'No items in wishlist yet.\nAdd items to see them here!',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.grey),
                           ),
@@ -293,13 +293,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                       );
                     }
                     
-                    // Sort by createdAt on client side
-                    final transactions = snapshot.data!.docs.toList();
-                    transactions.sort((a, b) {
+                    // Sort by addedAt on client side
+                    final wishlistItems = snapshot.data!.docs.toList();
+                    wishlistItems.sort((a, b) {
                       final aData = a.data() as Map<String, dynamic>;
                       final bData = b.data() as Map<String, dynamic>;
-                      final aTime = aData['createdAt'] as Timestamp?;
-                      final bTime = bData['createdAt'] as Timestamp?;
+                      final aTime = aData['addedAt'] as Timestamp?;
+                      final bTime = bData['addedAt'] as Timestamp?;
                       
                       if (aTime == null && bTime == null) return 0;
                       if (aTime == null) return 1;
@@ -310,14 +310,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                     
                     return ListView.builder(
                       padding: const EdgeInsets.all(8),
-                      itemCount: transactions.length,
+                      itemCount: wishlistItems.length,
                       itemBuilder: (context, index) {
-                        final doc = transactions[index];
+                        final doc = wishlistItems[index];
                         final data = doc.data() as Map<String, dynamic>;
-                        final createdAt = data['createdAt'] as Timestamp?;
-                        final completedAt = data['completedAt'] as Timestamp?;
-                        final withLocation = data['withMeetupLocation'] as bool? ?? false;
-                        final status = data['status'] ?? 'pending';
+                        final title = data['title'] ?? 'Unknown Item';
+                        final price = data['price'] ?? 0.0;
+                        final imageUrl = data['imageUrl'] ?? 'assets/images/placeholder.png';
+                        final addedAt = data['addedAt'] as Timestamp?;
                         
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -328,53 +328,25 @@ class _DashboardScreenState extends State<DashboardScreen>
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
                                 image: DecorationImage(
-                                  image: data['itemImageUrl'] != null && !data['itemImageUrl'].toString().startsWith('assets/')
-                                      ? NetworkImage(data['itemImageUrl'])
-                                      : const AssetImage('images/placeholder.png') as ImageProvider,
+                                  image: imageUrl.startsWith('assets/')
+                                      ? const AssetImage('assets/images/placeholder.png') as ImageProvider
+                                      : NetworkImage(imageUrl),
                                   fit: BoxFit.cover,
                                 ),
                               ),
                             ),
                             title: Text(
-                              data['itemTitle'] ?? 'No Title',
+                              title,
                               style: const TextStyle(fontWeight: FontWeight.bold),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (status == 'completed')
-                                  const Row(
-                                    children: [
-                                      Icon(Icons.check_circle, size: 14, color: Colors.green),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Completed ✓',
-                                        style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                if (withLocation)
-                                  const Row(
-                                    children: [
-                                      Icon(Icons.location_on, size: 14, color: Colors.blue),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Meetup arranged',
-                                        style: TextStyle(fontSize: 12, color: Colors.blue),
-                                      ),
-                                    ],
-                                  ),
-                                if (completedAt != null)
+                                if (addedAt != null)
                                   Text(
-                                    'Completed: ${_formatDate(completedAt.toDate())}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  )
-                                else if (createdAt != null)
-                                  Text(
-                                    'Created: ${_formatDate(createdAt.toDate())}',
+                                    'Added: ${_formatDate(addedAt.toDate())}',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey,
@@ -382,14 +354,82 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   ),
                               ],
                             ),
-                            trailing: Text(
-                              '₱${data['itemPrice']?.toString() ?? '0'}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                                fontSize: 16,
-                              ),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '₱${price.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.red,
+                                    size: 20,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('Remove from Wishlist'),
+                                        content: Text('Remove "$title" from your wishlist?'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context, false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context, true),
+                                            child: const Text(
+                                              'Remove',
+                                              style: TextStyle(color: Colors.red),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+
+                                    if (confirm == true && currentUser != null) {
+                                      try {
+                                        await _firestore
+                                            .collection('wishlists')
+                                            .doc(currentUser!.uid)
+                                            .collection('items')
+                                            .doc(doc.id)
+                                            .delete();
+                                        
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Item removed from wishlist'),
+                                            ),
+                                          );
+                                        }
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Error: $e'),
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    }
+                                  },
+                                ),
+                              ],
                             ),
+                            onTap: () {
+                              Navigator.of(context).pop();
+                              context.push('/listing');
+                            },
                           ),
                         );
                       },
@@ -459,8 +499,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                     Expanded(
                       child: _buildStatCard(
                         context,
-                        'Items Bought',
-                        _itemsBoughtCount.toString(),
+                        'Wishlist Items',
+                        _wishlistItemsCount.toString(),
                         'Updated just now',
                         Icons.favorite,
                       ),
@@ -519,8 +559,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           onTap: () {
             if (title == 'Items sold') {
               _showSoldItemsDialog(context);
-            } else if (title == 'Items Bought') {
-              _showBoughtItemsDialog(context);
+            } else if (title == 'Wishlist Items') {
+              _showWishlistItemsDialog(context);
             } else {
               showDialog(
                 context: context,
