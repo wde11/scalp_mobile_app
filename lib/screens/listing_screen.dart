@@ -848,11 +848,13 @@ class _ListingDetailsModal extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Listing Details',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: const Text(
+                      'Listing Details',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -1136,10 +1138,13 @@ class _ListingDetailsModal extends StatelessWidget {
                           }
                         }
                       },
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: const Text('Contact Seller'),
+                      icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                      label: const Text(
+                        'Contact',
+                        style: TextStyle(fontSize: 14),
+                      ),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
                       ),
                     ),
                   ),
@@ -1147,10 +1152,13 @@ class _ListingDetailsModal extends StatelessWidget {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => _addToWishlist(context),
-                      icon: const Icon(Icons.favorite_border),
-                      label: const Text('Add to Wishlist'),
+                      icon: const Icon(Icons.favorite_border, size: 18),
+                      label: const Text(
+                        'Wishlist',
+                        style: TextStyle(fontSize: 14),
+                      ),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
                       ),
                     ),
                   ),
