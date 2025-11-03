@@ -1436,11 +1436,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                           child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             onTap: () => _showScavengerHuntItemDetailsDialog(context, item),
                             leading: item.imageUrl.isNotEmpty
                                 ? Container(
-                                    width: 60,
-                                    height: 60,
+                                    width: 56,
+                                    height: 56,
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(8),
                                       image: DecorationImage(
@@ -1450,13 +1451,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     ),
                                   )
                                 : Container(
-                                    width: 60,
-                                    height: 60,
+                                    width: 56,
+                                    height: 56,
                                     decoration: BoxDecoration(
                                       color: Colors.grey[300],
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Icon(Icons.card_giftcard),
+                                    child: const Icon(Icons.card_giftcard, size: 28),
                                   ),
                             title: Text(
                               item.title,
@@ -1511,12 +1512,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                               ],
                             ),
                             trailing: SizedBox(
-                              width: 120,
+                              width: 110,
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Transform.scale(
-                                    scale: 0.8,
+                                    scale: 0.75,
                                     child: Switch(
                                       value: item.isActive,
                                       onChanged: (value) async {
