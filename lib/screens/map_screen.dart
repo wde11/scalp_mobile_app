@@ -1102,6 +1102,30 @@ class _MapScreenState extends State<MapScreen> {
               ],
             ),
           ),
+          // Scalp Logo in top-right corner
+          Positioned(
+            top: 40,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Image.asset(
+                'assets/images/scalp_logo_w_v2.png',
+                height: 32,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
         ],
       ),
     );

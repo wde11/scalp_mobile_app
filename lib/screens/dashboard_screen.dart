@@ -354,18 +354,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   ),
                               ],
                             ),
-                            trailing: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
                                   '₱${price.toStringAsFixed(2)}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: Colors.green,
-                                    fontSize: 16,
+                                    fontSize: 14,
                                   ),
                                 ),
+                                const SizedBox(width: 8),
                                 IconButton(
                                   icon: const Icon(
                                     Icons.delete_outline,
@@ -373,7 +373,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     size: 20,
                                   ),
                                   padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 32,
+                                    minHeight: 32,
+                                  ),
                                   onPressed: () async {
                                     final confirm = await showDialog<bool>(
                                       context: context,
@@ -484,6 +487,14 @@ class _DashboardScreenState extends State<DashboardScreen>
             onPressed: () {
               context.push('/profile');
             },
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+            child: Image.asset(
+              'assets/images/scalp_logo_w_v2.png',
+              height: 32,
+              fit: BoxFit.contain,
+            ),
           ),
         ],
       ),

@@ -982,6 +982,14 @@ class _ChatScreenState extends State<ChatScreen> {
                       icon: const Icon(Icons.add_rounded, color: Color(0xFF121330)),
                       onPressed: () => _showNewChatDialog(context),
                     ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                      child: Image.asset(
+                        'assets/images/scalp_logo_w_v2.png',
+                        height: 32,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
                   ]
                 : [
                     // Location sharing toggle
@@ -1013,7 +1021,15 @@ class _ChatScreenState extends State<ChatScreen> {
                     IconButton(
                       icon: const Icon(Icons.info_outline, color: Color(0xFF1F2030)),
                       onPressed: () {},
-                    )
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                      child: Image.asset(
+                        'assets/images/scalp_logo_w_v2.png',
+                        height: 32,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
                   ],
           ),
           body: SafeArea(

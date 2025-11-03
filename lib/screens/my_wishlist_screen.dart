@@ -115,6 +115,16 @@ class _MyWishlistScreenState extends State<MyWishlistScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Wishlist'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+            child: Image.asset(
+              'assets/images/scalp_logo_w_v2.png',
+              height: 32,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ],
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _firestore

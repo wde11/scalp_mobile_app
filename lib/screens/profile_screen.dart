@@ -181,6 +181,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               );
             },
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+            child: Image.asset(
+              'assets/images/scalp_logo_w_v2.png',
+              height: 32,
+              fit: BoxFit.contain,
+            ),
+          ),
         ],
       ),
       body: FutureBuilder<Map<String, dynamic>?>(
