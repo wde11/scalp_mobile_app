@@ -1461,35 +1461,48 @@ class _DashboardScreenState extends State<DashboardScreen>
                             title: Text(
                               item.title,
                               style: const TextStyle(fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('₱${item.price.toStringAsFixed(0)}'),
-                                Row(
+                                Text(
+                                  '₱${item.price.toStringAsFixed(0)}',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                                const SizedBox(height: 4),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
                                   children: [
-                                    Icon(
-                                      item.isActive ? Icons.check_circle : Icons.cancel,
-                                      size: 14,
-                                      color: item.isActive ? Colors.green : Colors.red,
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          item.isActive ? Icons.check_circle : Icons.cancel,
+                                          size: 12,
+                                          color: item.isActive ? Colors.green : Colors.red,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          item.isActive ? 'Active' : 'Inactive',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: item.isActive ? Colors.green : Colors.red,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      item.isActive ? 'Active' : 'Inactive',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: item.isActive ? Colors.green : Colors.red,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
                                     if (item.isClaimed)
-                                      const Row(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(Icons.person, size: 14, color: Colors.orange),
-                                          SizedBox(width: 4),
-                                          Text(
+                                          const Icon(Icons.person, size: 12, color: Colors.orange),
+                                          const SizedBox(width: 4),
+                                          const Text(
                                             'Claimed',
-                                            style: TextStyle(fontSize: 12, color: Colors.orange),
+                                            style: TextStyle(fontSize: 11, color: Colors.orange),
                                           ),
                                         ],
                                       ),
