@@ -209,18 +209,17 @@ class _ListingScreenState extends State<ListingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Image.asset(
+            'assets/images/scalp_logo_w_v2.png',
+            fit: BoxFit.contain,
+          ),
+        ),
         title: const Text('Listing'),
         actions: [
           IconButton(icon: const Icon(Icons.search), onPressed: () {}),
           IconButton(icon: const Icon(Icons.person), onPressed: () {}),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-            child: Image.asset(
-              'assets/images/scalp_logo_w_v2.png',
-              height: 32,
-              fit: BoxFit.contain,
-            ),
-          ),
         ],
       ),
       body: Padding(

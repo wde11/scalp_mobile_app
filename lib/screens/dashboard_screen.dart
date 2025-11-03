@@ -476,6 +476,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     final screenWidth = MediaQuery.of(context).size.width;
     return Scaffold(
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Image.asset(
+            'assets/images/scalp_logo_w_v2.png',
+            fit: BoxFit.contain,
+          ),
+        ),
         title: const Text('Welcome Back'),
         actions: [
           IconButton(
@@ -487,14 +494,6 @@ class _DashboardScreenState extends State<DashboardScreen>
             onPressed: () {
               context.push('/profile');
             },
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-            child: Image.asset(
-              'assets/images/scalp_logo_w_v2.png',
-              height: 32,
-              fit: BoxFit.contain,
-            ),
           ),
         ],
       ),

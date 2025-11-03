@@ -1102,10 +1102,10 @@ class _MapScreenState extends State<MapScreen> {
               ],
             ),
           ),
-          // Scalp Logo in top-right corner
+          // Scalp Logo in top-left corner
           Positioned(
             top: 40,
-            right: 16,
+            left: 16,
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
