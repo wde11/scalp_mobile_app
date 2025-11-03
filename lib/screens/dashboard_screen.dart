@@ -1395,7 +1395,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               const Divider(height: 1),
               Expanded(
                 child: StreamBuilder<List<ScavengerHuntItem>>(
-                  stream: _scavengerHuntService.getAllItems(),
+                  stream: _scavengerHuntService.getMyItems(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());

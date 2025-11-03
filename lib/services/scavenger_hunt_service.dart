@@ -168,8 +168,27 @@ class ScavengerHuntService {
             return ScavengerHuntItem.fromMap(doc.id, doc.data());
           })
           .toList();
-      print('Items mapped: ${items.length}');
+      print('Items returned: ${items.length}');
       return items;
+    });
+  }
+
+  // Get only current user's items
+  Stream<List<ScavengerHuntItem>> getMyItems() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return Stream.value([]);
+    }
+
+    return _firestore
+        .collection('scavenger_hunt_items')
+        .where('userId', isEqualTo: user.uid)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => ScavengerHuntItem.fromMap(doc.id, doc.data()))
+          .toList();
     });
   }
 
