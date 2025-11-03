@@ -2189,7 +2189,28 @@ class _ChatScreenState extends State<ChatScreen> {
         statusMessage = '⏰ Event has ended.';
       }
 
-      await _sendMessage(imageUrl: null, location: null, textOverride: statusMessage);
+      // Send the status message
+      final messageData = {
+        'senderId': currentUser!.uid,
+        'text': statusMessage,
+        'timestamp': FieldValue.serverTimestamp(),
+        'read': false,
+        'scavengerHuntStatusUpdate': {
+          'itemId': itemId,
+          'status': status,
+        },
+      };
+
+      await _firestore
+          .collection('chats')
+          .doc(_selectedChatId)
+          .collection('messages')
+          .add(messageData);
+
+      await _firestore.collection('chats').doc(_selectedChatId).update({
+        'lastMessage': statusMessage,
+        'lastMessageTime': FieldValue.serverTimestamp(),
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
