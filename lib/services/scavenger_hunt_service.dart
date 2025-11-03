@@ -102,11 +102,17 @@ class ScavengerHuntService {
     int? eventDurationMinutes,
   }) async {
     try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
       print('=== CREATING SCAVENGER HUNT ITEM ===');
       print('Title: $title');
       print('Price: $price');
       print('Quantity: $quantity');
       print('Event Duration: $eventDurationMinutes minutes');
+      print('Creator UserId: ${user.uid}');
       
       final now = DateTime.now();
       final eventEndTime = eventDurationMinutes != null 
@@ -116,6 +122,7 @@ class ScavengerHuntService {
       print('Event End Time: $eventEndTime');
       
       final docRef = await _firestore.collection('scavenger_hunt_items').add({
+        'userId': user.uid, // Store creator's user ID
         'title': title,
         'price': price,
         'description': description,
@@ -128,6 +135,7 @@ class ScavengerHuntService {
         'claimedBy': null,
         'claimedAt': null,
         'eventEndTime': eventEndTime,
+        'status': 'available', // Default status
       });
 
       print('Item created with ID: ${docRef.id}');
@@ -160,8 +168,27 @@ class ScavengerHuntService {
             return ScavengerHuntItem.fromMap(doc.id, doc.data());
           })
           .toList();
-      print('Items mapped: ${items.length}');
+      print('Items returned: ${items.length}');
       return items;
+    });
+  }
+
+  // Get only current user's items
+  Stream<List<ScavengerHuntItem>> getMyItems() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return Stream.value([]);
+    }
+
+    return _firestore
+        .collection('scavenger_hunt_items')
+        .where('userId', isEqualTo: user.uid)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => ScavengerHuntItem.fromMap(doc.id, doc.data()))
+          .toList();
     });
   }
 
@@ -185,6 +212,43 @@ class ScavengerHuntService {
       print('Error deleting item: $e');
       rethrow;
     }
+  }
+
+  // Update item status (only seller can do this)
+  Future<void> updateItemStatus(String itemId, String status) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
+      // Verify user is the seller
+      final itemDoc = await _firestore.collection('scavenger_hunt_items').doc(itemId).get();
+      if (!itemDoc.exists) {
+        throw Exception('Item not found');
+      }
+
+      final itemData = itemDoc.data()!;
+      if (itemData['userId'] != user.uid) {
+        throw Exception('Only the seller can update item status');
+      }
+
+      await _firestore.collection('scavenger_hunt_items').doc(itemId).update({
+        'status': status,
+      });
+
+      print('Item status updated to: $status');
+    } catch (e) {
+      print('Error updating item status: $e');
+      rethrow;
+    }
+  }
+
+  // Check if current user is the seller of the item
+  bool isItemSeller(ScavengerHuntItem item) {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    return item.userId == user.uid;
   }
 
   // Send notification to all users

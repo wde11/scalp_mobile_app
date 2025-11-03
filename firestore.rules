@@ -74,14 +74,16 @@ service cloud.firestore {
 
     // Scavenger Hunt Items collection
     match /scavenger_hunt_items/{itemId} {
-      // Authenticated users can read all scavenger hunt items
+      // Authenticated users can read all scavenger hunt items (global view)
       allow read: if request.auth != null;
       
       // Only authenticated users can create scavenger hunt items
+      // Must include userId matching the creator
       // Validates required fields
       allow create: if request.auth != null &&
-                       request.resource.data.keys().hasAll(['title', 'price', 'description', 'imageUrl', 
-                                                            'latitude', 'longitude', 'quantity', 'isActive', 'createdAt']) &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['userId', 'title', 'price', 'description', 'imageUrl', 
+                                                            'latitude', 'longitude', 'quantity', 'isActive', 'createdAt', 'status']) &&
                        request.resource.data.title is string &&
                        request.resource.data.title.size() > 0 &&
                        request.resource.data.price is number &&
@@ -90,27 +92,32 @@ service cloud.firestore {
                        request.resource.data.quantity > 0 &&
                        request.resource.data.isActive is bool &&
                        request.resource.data.latitude is number &&
-                       request.resource.data.longitude is number;
+                       request.resource.data.longitude is number &&
+                       request.resource.data.status in ['available', 'taken', 'ended'];
       
-      // Users can update items for:
-      // 1. Claiming an item (setting claimedBy and claimedAt)
-      // 2. Toggling active status (admin-like function)
-      allow update: if request.auth != null && (
-        // Claiming an item: can only claim if not already claimed and item is active
-        (resource.data.claimedBy == null && 
-         resource.data.isActive == true &&
-         request.resource.data.claimedBy == request.auth.uid &&
-         request.resource.data.keys().hasAll(['claimedBy', 'claimedAt']) &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimedBy', 'claimedAt'])) ||
-        
-        // Toggling active status or updating item details
-        // (In production, you might want to restrict this to admin users only)
-        (request.resource.data.diff(resource.data).affectedKeys().hasAny(['isActive', 'title', 'description', 'price', 'quantity', 'eventEndTime']))
-      );
+      // Users can update items:
+      // 1. Only the creator (userId matches) can toggle isActive status or delete
+      // 2. Only the creator can update status field ('available', 'taken', 'ended')
+      // 3. Only the creator can update other item details (title, description, price, etc.)
+      allow update: if request.auth != null && 
+                       resource.data.userId == request.auth.uid && (
+                         // Toggling active/inactive status
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isActive']) ||
+                         
+                         // Updating item status (available, taken, ended)
+                         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+                          request.resource.data.status in ['available', 'taken', 'ended']) ||
+                         
+                         // Updating item details
+                         request.resource.data.diff(resource.data).affectedKeys().hasAny(['title', 'description', 'price', 'quantity', 'eventEndTime']) ||
+                         
+                         // Updating claimed status (for backward compatibility)
+                         request.resource.data.diff(resource.data).affectedKeys().hasAny(['claimedBy', 'claimedAt'])
+                       );
       
-      // Allow deletion (typically for admins/creators)
-      // In production, you might want to add admin role checking here
-      allow delete: if request.auth != null;
+      // Only the creator (userId matches) can delete their own scavenger hunt items
+      allow delete: if request.auth != null && 
+                       resource.data.userId == request.auth.uid;
     }
     
     // Transactions collection

@@ -1,5 +1,6 @@
 class ScavengerHuntItem {
   final String id;
+  final String userId; // Seller/Creator of the item
   final String title;
   final double price;
   final String description;
@@ -12,9 +13,11 @@ class ScavengerHuntItem {
   final String? claimedBy;
   final DateTime? claimedAt;
   final DateTime? eventEndTime; // Global event timer
+  final String status; // 'available', 'taken', 'ended'
 
   ScavengerHuntItem({
     required this.id,
+    required this.userId,
     required this.title,
     required this.price,
     required this.description,
@@ -27,11 +30,13 @@ class ScavengerHuntItem {
     this.claimedBy,
     this.claimedAt,
     this.eventEndTime,
+    this.status = 'available',
   });
 
   factory ScavengerHuntItem.fromMap(String id, Map<String, dynamic> map) {
     return ScavengerHuntItem(
       id: id,
+      userId: map['userId'] ?? '',
       title: map['title'] ?? '',
       price: (map['price'] ?? 0).toDouble(),
       description: map['description'] ?? '',
@@ -44,11 +49,13 @@ class ScavengerHuntItem {
       claimedBy: map['claimedBy'],
       claimedAt: map['claimedAt']?.toDate(),
       eventEndTime: map['eventEndTime']?.toDate(),
+      status: map['status'] ?? 'available',
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
+      'userId': userId,
       'title': title,
       'price': price,
       'description': description,
@@ -61,6 +68,7 @@ class ScavengerHuntItem {
       'claimedBy': claimedBy,
       'claimedAt': claimedAt,
       'eventEndTime': eventEndTime,
+      'status': status,
     };
   }
 

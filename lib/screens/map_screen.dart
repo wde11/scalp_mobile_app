@@ -2,15 +2,17 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:scalp_mobile_app/models/location_data.dart';
-import 'package:scalp_mobile_app/models/transaction.dart';
+import 'package:scalp_mobile_app/models/transaction.dart' as models;
 import 'package:scalp_mobile_app/services/directions_service.dart';
 import 'package:scalp_mobile_app/services/scavenger_hunt_service.dart';
 import 'package:scalp_mobile_app/models/scavenger_hunt_item.dart';
 import 'package:scalp_mobile_app/globals.dart';
 
 class MapScreen extends StatefulWidget {
-  final Transaction? activeTransaction;
+  final models.Transaction? activeTransaction;
   final LocationData? sharedLocation;
   
   const MapScreen({super.key, this.activeTransaction, this.sharedLocation});
@@ -420,10 +422,10 @@ class _MapScreenState extends State<MapScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () => _claimItem(item),
-                      icon: const Icon(Icons.card_giftcard),
+                      onPressed: () => _contactSeller(item),
+                      icon: const Icon(Icons.chat_bubble_outline),
                       label: const Text(
-                        'Claim Item',
+                        'Contact Seller',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       style: ElevatedButton.styleFrom(
@@ -515,23 +517,109 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  Future<void> _claimItem(ScavengerHuntItem item) async {
+  Future<void> _contactSeller(ScavengerHuntItem item) async {
     Navigator.pop(context); // Close bottom sheet
 
-    final success = await _scavengerHuntService.claimItem(item.id);
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            success
-                ? '🎉 Item claimed successfully!'
-                : 'Failed to claim item. It may have been claimed by someone else.',
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to contact the seller'),
+            backgroundColor: Colors.red,
           ),
-          backgroundColor: success ? Colors.green : Colors.red,
-        ),
-      );
+        );
+      }
+      return;
     }
+
+    if (currentUser.uid == item.userId) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You cannot contact yourself!'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      
+      // Generate chat ID
+      final chatId = _generateChatId(currentUser.uid, item.userId);
+      
+      // Get or create chat
+      final chatDoc = await firestore.collection('chats').doc(chatId).get();
+      if (!chatDoc.exists) {
+        await firestore.collection('chats').doc(chatId).set({
+          'participants': [currentUser.uid, item.userId],
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastMessage': '',
+          'lastMessageTime': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Send scavenger hunt inquiry message
+      final messageData = {
+        'senderId': currentUser.uid,
+        'text': 'Is this scavenger hunt item available?',
+        'timestamp': FieldValue.serverTimestamp(),
+        'read': false,
+        'scavengerHuntInquiry': {
+          'itemId': item.id,
+          'title': item.title,
+          'price': item.price,
+          'imageUrl': item.imageUrl,
+          'status': item.status,
+        },
+      };
+
+      await firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .add(messageData);
+
+      await firestore.collection('chats').doc(chatId).update({
+        'lastMessage': 'Scavenger hunt inquiry: ${item.title}',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✉️ Message sent to seller! Check your chats.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        
+        // Navigate to chat screen after a short delay
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            Navigator.of(context).pushNamed('/chat');
+          }
+        });
+      }
+    } catch (e) {
+      print('Error contacting seller: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _generateChatId(String userId1, String userId2) {
+    final sortedIds = [userId1, userId2]..sort();
+    return '${sortedIds[0]}_${sortedIds[1]}';
   }
 
   void _showMyScavengerHuntItems() {

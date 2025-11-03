@@ -1395,7 +1395,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               const Divider(height: 1),
               Expanded(
                 child: StreamBuilder<List<ScavengerHuntItem>>(
-                  stream: _scavengerHuntService.getAllItems(),
+                  stream: _scavengerHuntService.getMyItems(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
@@ -1436,12 +1436,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                           child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                             onTap: () => _showScavengerHuntItemDetailsDialog(context, item),
                             leading: item.imageUrl.isNotEmpty
                                 ? Container(
-                                    width: 56,
-                                    height: 56,
+                                    width: 50,
+                                    height: 50,
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(8),
                                       image: DecorationImage(
@@ -1451,13 +1451,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     ),
                                   )
                                 : Container(
-                                    width: 56,
-                                    height: 56,
+                                    width: 50,
+                                    height: 50,
                                     decoration: BoxDecoration(
                                       color: Colors.grey[300],
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Icon(Icons.card_giftcard, size: 28),
+                                    child: const Icon(Icons.card_giftcard, size: 26),
                                   ),
                             title: Text(
                               item.title,
@@ -1512,13 +1512,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                               ],
                             ),
                             trailing: SizedBox(
-                              width: 90,
+                              width: 75,
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
                                   Transform.scale(
-                                    scale: 0.65,
+                                    scale: 0.55,
                                     child: Switch(
                                       value: item.isActive,
                                       onChanged: (value) async {
@@ -1546,11 +1546,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       },
                                     ),
                                   ),
-                                  const SizedBox(width: 2),
                                   IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red, size: 17),
+                                    icon: const Icon(Icons.delete, color: Colors.red, size: 15),
                                     padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                                    constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
                                     onPressed: () async {
                                     final confirmed = await showDialog<bool>(
                                       context: context,
