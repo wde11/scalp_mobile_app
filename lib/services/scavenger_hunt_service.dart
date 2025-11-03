@@ -99,9 +99,23 @@ class ScavengerHuntService {
     required double latitude,
     required double longitude,
     required int quantity,
+    int? eventDurationMinutes,
   }) async {
     try {
-      await _firestore.collection('scavenger_hunt_items').add({
+      print('=== CREATING SCAVENGER HUNT ITEM ===');
+      print('Title: $title');
+      print('Price: $price');
+      print('Quantity: $quantity');
+      print('Event Duration: $eventDurationMinutes minutes');
+      
+      final now = DateTime.now();
+      final eventEndTime = eventDurationMinutes != null 
+          ? now.add(Duration(minutes: eventDurationMinutes))
+          : null;
+      
+      print('Event End Time: $eventEndTime');
+      
+      final docRef = await _firestore.collection('scavenger_hunt_items').add({
         'title': title,
         'price': price,
         'description': description,
@@ -113,13 +127,18 @@ class ScavengerHuntService {
         'createdAt': FieldValue.serverTimestamp(),
         'claimedBy': null,
         'claimedAt': null,
+        'eventEndTime': eventEndTime,
       });
+
+      print('Item created with ID: ${docRef.id}');
 
       // Send notification to all users
       await _notifyAllUsers(
         'New Scavenger Hunt Item!',
         'Find "$title" worth ₱${price.toStringAsFixed(0)} on the map!',
       );
+      
+      print('Notifications sent to all users');
     } catch (e) {
       print('Error creating scavenger hunt item: $e');
       rethrow;
@@ -133,9 +152,16 @@ class ScavengerHuntService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => ScavengerHuntItem.fromMap(doc.id, doc.data()))
+      print('=== SCAVENGER HUNT DEBUG ===');
+      print('Total items retrieved: ${snapshot.docs.length}');
+      final items = snapshot.docs
+          .map((doc) {
+            print('Item: ${doc.id} - ${doc.data()['title']}');
+            return ScavengerHuntItem.fromMap(doc.id, doc.data());
+          })
           .toList();
+      print('Items mapped: ${items.length}');
+      return items;
     });
   }
 

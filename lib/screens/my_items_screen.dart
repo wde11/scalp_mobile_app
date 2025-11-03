@@ -238,6 +238,13 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Image.asset(
+            'assets/images/scalp_logo_w_v2.png',
+            fit: BoxFit.contain,
+          ),
+        ),
         title: const Text('My Items'),
       ),
       body: StreamBuilder<QuerySnapshot>(

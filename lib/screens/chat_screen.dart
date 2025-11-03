@@ -959,7 +959,13 @@ class _ChatScreenState extends State<ChatScreen> {
                       });
                     },
                   )
-                : null,
+                : Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Image.asset(
+                      'assets/images/scalp_logo_w_v2.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
             title: _selectedUserId != null
                 ? Row(
                     children: [
@@ -1013,7 +1019,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     IconButton(
                       icon: const Icon(Icons.info_outline, color: Color(0xFF1F2030)),
                       onPressed: () {},
-                    )
+                    ),
                   ],
           ),
           body: SafeArea(

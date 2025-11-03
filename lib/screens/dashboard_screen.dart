@@ -27,10 +27,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final ScavengerHuntService _scavengerHuntService = ScavengerHuntService();
-  final cloudinary = CloudinaryPublic('dk6k4xkqw', 'ml_default', cache: false);
+  final cloudinary = CloudinaryPublic('dp5mqhd9w', 'scalp_preset', cache: false);
   
   int _itemsSoldCount = 0;
-  int _itemsBoughtCount = 0;
+  int _wishlistItemsCount = 0;
   
   User? get currentUser => _auth.currentUser;
 
@@ -60,17 +60,17 @@ class _DashboardScreenState extends State<DashboardScreen>
           .where('isSold', isEqualTo: true)
           .get();
       
-      // Count bought items (transactions where user is the buyer and completed)
-      final boughtSnapshot = await _firestore
-          .collection('transactions')
-          .where('buyerId', isEqualTo: currentUser!.uid)
-          .where('status', isEqualTo: 'completed')
+      // Count wishlist items
+      final wishlistSnapshot = await _firestore
+          .collection('wishlists')
+          .doc(currentUser!.uid)
+          .collection('items')
           .get();
       
       if (mounted) {
         setState(() {
           _itemsSoldCount = soldSnapshot.docs.length;
-          _itemsBoughtCount = boughtSnapshot.docs.length;
+          _wishlistItemsCount = wishlistSnapshot.docs.length;
         });
       }
     } catch (e) {
@@ -225,7 +225,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
   
-  void _showBoughtItemsDialog(BuildContext context) {
+  void _showWishlistItemsDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -239,7 +239,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Items Bought',
+                      'My Wishlist',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -257,9 +257,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                 child: StreamBuilder<QuerySnapshot>(
                   stream: currentUser != null
                       ? _firestore
-                          .collection('transactions')
-                          .where('buyerId', isEqualTo: currentUser!.uid)
-                          .where('status', isEqualTo: 'completed')
+                          .collection('wishlists')
+                          .doc(currentUser!.uid)
+                          .collection('items')
                           .snapshots()
                       : null,
                   builder: (context, snapshot) {
@@ -272,7 +272,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         child: Padding(
                           padding: const EdgeInsets.all(24.0),
                           child: Text(
-                            'Error loading bought items: ${snapshot.error}',
+                            'Error loading wishlist: ${snapshot.error}',
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.red),
                           ),
@@ -285,7 +285,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         child: Padding(
                           padding: EdgeInsets.all(24.0),
                           child: Text(
-                            'No purchases yet.\nBuy items to see them here!',
+                            'No items in wishlist yet.\nAdd items to see them here!',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.grey),
                           ),
@@ -293,13 +293,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                       );
                     }
                     
-                    // Sort by createdAt on client side
-                    final transactions = snapshot.data!.docs.toList();
-                    transactions.sort((a, b) {
+                    // Sort by addedAt on client side
+                    final wishlistItems = snapshot.data!.docs.toList();
+                    wishlistItems.sort((a, b) {
                       final aData = a.data() as Map<String, dynamic>;
                       final bData = b.data() as Map<String, dynamic>;
-                      final aTime = aData['createdAt'] as Timestamp?;
-                      final bTime = bData['createdAt'] as Timestamp?;
+                      final aTime = aData['addedAt'] as Timestamp?;
+                      final bTime = bData['addedAt'] as Timestamp?;
                       
                       if (aTime == null && bTime == null) return 0;
                       if (aTime == null) return 1;
@@ -310,14 +310,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                     
                     return ListView.builder(
                       padding: const EdgeInsets.all(8),
-                      itemCount: transactions.length,
+                      itemCount: wishlistItems.length,
                       itemBuilder: (context, index) {
-                        final doc = transactions[index];
+                        final doc = wishlistItems[index];
                         final data = doc.data() as Map<String, dynamic>;
-                        final createdAt = data['createdAt'] as Timestamp?;
-                        final completedAt = data['completedAt'] as Timestamp?;
-                        final withLocation = data['withMeetupLocation'] as bool? ?? false;
-                        final status = data['status'] ?? 'pending';
+                        final title = data['title'] ?? 'Unknown Item';
+                        final price = data['price'] ?? 0.0;
+                        final imageUrl = data['imageUrl'] ?? 'assets/images/placeholder.png';
+                        final addedAt = data['addedAt'] as Timestamp?;
                         
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -328,53 +328,25 @@ class _DashboardScreenState extends State<DashboardScreen>
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
                                 image: DecorationImage(
-                                  image: data['itemImageUrl'] != null && !data['itemImageUrl'].toString().startsWith('assets/')
-                                      ? NetworkImage(data['itemImageUrl'])
-                                      : const AssetImage('images/placeholder.png') as ImageProvider,
+                                  image: imageUrl.startsWith('assets/')
+                                      ? const AssetImage('assets/images/placeholder.png') as ImageProvider
+                                      : NetworkImage(imageUrl),
                                   fit: BoxFit.cover,
                                 ),
                               ),
                             ),
                             title: Text(
-                              data['itemTitle'] ?? 'No Title',
+                              title,
                               style: const TextStyle(fontWeight: FontWeight.bold),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (status == 'completed')
-                                  const Row(
-                                    children: [
-                                      Icon(Icons.check_circle, size: 14, color: Colors.green),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Completed ✓',
-                                        style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                if (withLocation)
-                                  const Row(
-                                    children: [
-                                      Icon(Icons.location_on, size: 14, color: Colors.blue),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Meetup arranged',
-                                        style: TextStyle(fontSize: 12, color: Colors.blue),
-                                      ),
-                                    ],
-                                  ),
-                                if (completedAt != null)
+                                if (addedAt != null)
                                   Text(
-                                    'Completed: ${_formatDate(completedAt.toDate())}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  )
-                                else if (createdAt != null)
-                                  Text(
-                                    'Created: ${_formatDate(createdAt.toDate())}',
+                                    'Added: ${_formatDate(addedAt.toDate())}',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey,
@@ -382,14 +354,85 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   ),
                               ],
                             ),
-                            trailing: Text(
-                              '₱${data['itemPrice']?.toString() ?? '0'}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                                fontSize: 16,
-                              ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '₱${price.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.red,
+                                    size: 20,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 32,
+                                    minHeight: 32,
+                                  ),
+                                  onPressed: () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('Remove from Wishlist'),
+                                        content: Text('Remove "$title" from your wishlist?'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context, false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context, true),
+                                            child: const Text(
+                                              'Remove',
+                                              style: TextStyle(color: Colors.red),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+
+                                    if (confirm == true && currentUser != null) {
+                                      try {
+                                        await _firestore
+                                            .collection('wishlists')
+                                            .doc(currentUser!.uid)
+                                            .collection('items')
+                                            .doc(doc.id)
+                                            .delete();
+                                        
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Item removed from wishlist'),
+                                            ),
+                                          );
+                                        }
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Error: $e'),
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    }
+                                  },
+                                ),
+                              ],
                             ),
+                            onTap: () {
+                              Navigator.of(context).pop();
+                              context.push('/listing');
+                            },
                           ),
                         );
                       },
@@ -433,6 +476,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     final screenWidth = MediaQuery.of(context).size.width;
     return Scaffold(
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Image.asset(
+            'assets/images/scalp_logo_w_v2.png',
+            fit: BoxFit.contain,
+          ),
+        ),
         title: const Text('Welcome Back'),
         actions: [
           IconButton(
@@ -459,8 +509,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                     Expanded(
                       child: _buildStatCard(
                         context,
-                        'Items Bought',
-                        _itemsBoughtCount.toString(),
+                        'Wishlist Items',
+                        _wishlistItemsCount.toString(),
                         'Updated just now',
                         Icons.favorite,
                       ),
@@ -519,8 +569,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           onTap: () {
             if (title == 'Items sold') {
               _showSoldItemsDialog(context);
-            } else if (title == 'Items Bought') {
-              _showBoughtItemsDialog(context);
+            } else if (title == 'Wishlist Items') {
+              _showWishlistItemsDialog(context);
             } else {
               showDialog(
                 context: context,
@@ -859,7 +909,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ),
                   ),
                   const SizedBox(width: 16),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -867,16 +917,20 @@ class _DashboardScreenState extends State<DashboardScreen>
                           'Scavenger Hunt',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 24,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           'Manage treasure items',
                           style: TextStyle(
                             color: Colors.white70,
-                            fontSize: 14,
+                            fontSize: 11,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -960,12 +1014,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () => _showCreateScavengerHuntDialog(context),
-                              icon: const Icon(Icons.add),
-                              label: const Text('Create New Item'),
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text(
+                                'Create',
+                                style: TextStyle(fontSize: 13),
+                              ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
                                 foregroundColor: Colors.deepOrange,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 8,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -976,12 +1036,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () => _showManageScavengerHuntDialog(context),
-                              icon: const Icon(Icons.manage_search),
-                              label: const Text('Manage Items'),
+                              icon: const Icon(Icons.manage_search, size: 18),
+                              label: const Text(
+                                'Manage',
+                                style: TextStyle(fontSize: 13),
+                              ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white.withOpacity(0.2),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 8,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -1006,6 +1072,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     final priceController = TextEditingController();
     final descriptionController = TextEditingController();
     final quantityController = TextEditingController(text: '1');
+    final eventDurationController = TextEditingController(text: '60');
     double? selectedLat;
     double? selectedLng;
     XFile? selectedImage;
@@ -1014,11 +1081,16 @@ class _DashboardScreenState extends State<DashboardScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.card_giftcard, color: Colors.deepOrange),
-              SizedBox(width: 8),
-              Text('Create Scavenger Hunt Item'),
+              const Icon(Icons.card_giftcard, color: Colors.deepOrange),
+              const SizedBox(width: 8),
+              Expanded(
+                child: const Text(
+                  'Create Scavenger Hunt Item',
+                  style: TextStyle(fontSize: 18),
+                ),
+              ),
             ],
           ),
           content: SingleChildScrollView(
@@ -1131,6 +1203,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                       border: OutlineInputBorder(),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: eventDurationController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Event Duration (minutes)',
+                      border: OutlineInputBorder(),
+                      helperText: 'How long the event will last',
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: () async {
@@ -1194,13 +1276,22 @@ class _DashboardScreenState extends State<DashboardScreen>
                   return;
                 }
 
-                // Show loading
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Creating scavenger hunt item...')),
-                );
+                // Save context reference before async gap
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
 
                 try {
+                  // Close dialog first
+                  navigator.pop();
+                  
+                  // Show loading message
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Creating scavenger hunt item...'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+
                   String imageUrl = 'https://via.placeholder.com/400x300?text=Scavenger+Hunt';
 
                   // Upload image if selected
@@ -1224,16 +1315,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                       }
                       final response = await cloudinary.uploadFile(cloudinaryFile);
                       imageUrl = response.secureUrl;
+                      print('Image uploaded successfully: $imageUrl');
                     } catch (uploadError) {
                       print('Image upload failed: $uploadError');
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Image upload failed. Using placeholder.'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      }
+                      // Continue with placeholder - don't fail the whole operation
                     }
                   }
 
@@ -1245,22 +1330,25 @@ class _DashboardScreenState extends State<DashboardScreen>
                     latitude: selectedLat!,
                     longitude: selectedLng!,
                     quantity: int.parse(quantityController.text),
+                    eventDurationMinutes: int.tryParse(eventDurationController.text),
                   );
 
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Scavenger hunt item created! All users notified.'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Scavenger hunt item created successfully!'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e')),
-                    );
-                  }
+                  print('Error creating scavenger hunt item: $e');
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -1288,11 +1376,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Manage Scavenger Hunt Items',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: const Text(
+                        'Manage Scavenger Hunt Items',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     IconButton(
@@ -1309,6 +1399,19 @@ class _DashboardScreenState extends State<DashboardScreen>
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Text(
+                            'Error loading items: ${snapshot.error}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      );
                     }
 
                     if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -1333,10 +1436,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                           child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            onTap: () => _showScavengerHuntItemDetailsDialog(context, item),
                             leading: item.imageUrl.isNotEmpty
                                 ? Container(
-                                    width: 60,
-                                    height: 60,
+                                    width: 56,
+                                    height: 56,
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(8),
                                       image: DecorationImage(
@@ -1346,46 +1451,59 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     ),
                                   )
                                 : Container(
-                                    width: 60,
-                                    height: 60,
+                                    width: 56,
+                                    height: 56,
                                     decoration: BoxDecoration(
                                       color: Colors.grey[300],
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Icon(Icons.card_giftcard),
+                                    child: const Icon(Icons.card_giftcard, size: 28),
                                   ),
                             title: Text(
                               item.title,
                               style: const TextStyle(fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('₱${item.price.toStringAsFixed(0)}'),
-                                Row(
+                                Text(
+                                  '₱${item.price.toStringAsFixed(0)}',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                                const SizedBox(height: 4),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
                                   children: [
-                                    Icon(
-                                      item.isActive ? Icons.check_circle : Icons.cancel,
-                                      size: 14,
-                                      color: item.isActive ? Colors.green : Colors.red,
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          item.isActive ? Icons.check_circle : Icons.cancel,
+                                          size: 12,
+                                          color: item.isActive ? Colors.green : Colors.red,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          item.isActive ? 'Active' : 'Inactive',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: item.isActive ? Colors.green : Colors.red,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      item.isActive ? 'Active' : 'Inactive',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: item.isActive ? Colors.green : Colors.red,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
                                     if (item.isClaimed)
-                                      const Row(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(Icons.person, size: 14, color: Colors.orange),
-                                          SizedBox(width: 4),
-                                          Text(
+                                          const Icon(Icons.person, size: 12, color: Colors.orange),
+                                          const SizedBox(width: 4),
+                                          const Text(
                                             'Claimed',
-                                            style: TextStyle(fontSize: 12, color: Colors.orange),
+                                            style: TextStyle(fontSize: 11, color: Colors.orange),
                                           ),
                                         ],
                                       ),
@@ -1393,38 +1511,47 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 ),
                               ],
                             ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Switch(
-                                  value: item.isActive,
-                                  onChanged: (value) async {
-                                    try {
-                                      await _scavengerHuntService.toggleItemStatus(
-                                        item.id,
-                                        value,
-                                      );
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              value ? 'Item activated' : 'Item deactivated',
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    } catch (e) {
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Error: $e')),
-                                        );
-                                      }
-                                    }
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () async {
+                            trailing: SizedBox(
+                              width: 90,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Transform.scale(
+                                    scale: 0.65,
+                                    child: Switch(
+                                      value: item.isActive,
+                                      onChanged: (value) async {
+                                        try {
+                                          await _scavengerHuntService.toggleItemStatus(
+                                            item.id,
+                                            value,
+                                          );
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  value ? 'Item activated' : 'Item deactivated',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        } catch (e) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(content: Text('Error: $e')),
+                                            );
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete, color: Colors.red, size: 17),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                                    onPressed: () async {
                                     final confirmed = await showDialog<bool>(
                                       context: context,
                                       builder: (context) => AlertDialog(
@@ -1474,6 +1601,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 ),
                               ],
                             ),
+                            ),
                           ),
                         );
                       },
@@ -1486,5 +1614,324 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
       ),
     );
+  }
+
+  void _showScavengerHuntItemDetailsDialog(BuildContext context, ScavengerHuntItem item) {
+    final isEventActive = item.isEventActive;
+    final timeRemaining = item.timeRemaining;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    border: Border(bottom: BorderSide(color: Colors.blue[200]!)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Scavenger Hunt Item Details',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(dialogContext),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Item image
+                      if (item.imageUrl.isNotEmpty)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            item.imageUrl,
+                            height: 200,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                height: 200,
+                                color: Colors.grey[300],
+                                child: const Icon(Icons.image_not_supported, size: 50),
+                              );
+                            },
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+
+                      // Title
+                      Text(
+                        item.title,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Price
+                      Text(
+                        '₱${item.price.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Description
+                      Text(
+                        item.description,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Location Info
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue[200]!),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.location_on, color: Colors.blue, size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Location',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Latitude: ${item.latitude.toStringAsFixed(6)}',
+                              style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                            ),
+                            Text(
+                              'Longitude: ${item.longitude.toStringAsFixed(6)}',
+                              style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Item Details
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildDetailRow('Quantity', '${item.quantity}'),
+                            const Divider(),
+                            _buildDetailRow('Status', item.isActive ? 'Active' : 'Inactive'),
+                            const Divider(),
+                            _buildDetailRow(
+                              'Claim Status',
+                              item.isClaimed ? 'Claimed' : 'Available',
+                            ),
+                            if (item.claimedBy != null) ...[
+                              const Divider(),
+                              _buildDetailRow('Claimed By', item.claimedBy!),
+                            ],
+                            if (item.eventEndTime != null) ...[
+                              const Divider(),
+                              _buildDetailRow(
+                                'Event Status',
+                                isEventActive ? 'Active' : 'Ended',
+                              ),
+                            ],
+                            if (timeRemaining != null && isEventActive) ...[
+                              const Divider(),
+                              _buildDetailRow(
+                                'Time Remaining',
+                                _formatDuration(timeRemaining),
+                              ),
+                            ],
+                            const Divider(),
+                            _buildDetailRow(
+                              'Created',
+                              _formatDate(item.createdAt),
+                            ),
+                            if (item.claimedAt != null) ...[
+                              const Divider(),
+                              _buildDetailRow(
+                                'Claimed At',
+                                _formatDate(item.claimedAt!),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Status badges
+                      Row(
+                        children: [
+                          if (item.isActive)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.green[100],
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check_circle, size: 16, color: Colors.green[700]),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Active',
+                                    style: TextStyle(
+                                      color: Colors.green[700],
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.red[100],
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.cancel, size: 16, color: Colors.red[700]),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Inactive',
+                                    style: TextStyle(
+                                      color: Colors.red[700],
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          const SizedBox(width: 8),
+                          if (item.isClaimed)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.orange[100],
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.person, size: 16, color: Colors.orange[700]),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Claimed',
+                                    style: TextStyle(
+                                      color: Colors.orange[700],
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontSize: 14,
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    if (duration.inDays > 0) {
+      return '${duration.inDays}d ${duration.inHours.remainder(24)}h';
+    } else if (duration.inHours > 0) {
+      return '${duration.inHours}h ${duration.inMinutes.remainder(60)}m';
+    } else if (duration.inMinutes > 0) {
+      return '${duration.inMinutes}m';
+    } else {
+      return '${duration.inSeconds}s';
+    }
   }
 }

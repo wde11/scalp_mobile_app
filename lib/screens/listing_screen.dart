@@ -209,6 +209,13 @@ class _ListingScreenState extends State<ListingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Image.asset(
+            'assets/images/scalp_logo_w_v2.png',
+            fit: BoxFit.contain,
+          ),
+        ),
         title: const Text('Listing'),
         actions: [
           IconButton(icon: const Icon(Icons.search), onPressed: () {}),
@@ -736,7 +743,13 @@ class _ListingDetailsModal extends StatelessWidget {
 
   Future<void> _addToWishlist(BuildContext context) async {
     final currentUser = _auth.currentUser;
+    
+    print('=== ADD TO WISHLIST DEBUG ===');
+    print('Current user: ${currentUser?.uid}');
+    print('User email: ${currentUser?.email}');
+    
     if (currentUser == null) {
+      print('ERROR: User is not authenticated');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please sign in to add items to wishlist')),
       );
@@ -750,7 +763,12 @@ class _ListingDetailsModal extends StatelessWidget {
     final imageUrl = data['imageUrl'] ?? 'assets/images/placeholder.png';
     final sellerId = data['userId'];
 
+    print('Listing ID: $listingId');
+    print('Seller ID: $sellerId');
+    print('Wishlist path: wishlists/${currentUser.uid}/items/$listingId');
+
     if (sellerId == currentUser.uid) {
+      print('ERROR: Cannot add own listing');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You cannot add your own listing to wishlist')),
       );
@@ -758,6 +776,7 @@ class _ListingDetailsModal extends StatelessWidget {
     }
 
     try {
+      print('Checking if item already in wishlist...');
       // Check if the item is already in the wishlist
       final wishlistItem = await _firestore
           .collection('wishlists')
@@ -767,12 +786,14 @@ class _ListingDetailsModal extends StatelessWidget {
           .get();
 
       if (wishlistItem.exists) {
+        print('Item already in wishlist');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Item already in wishlist')),
         );
         return;
       }
 
+      print('Adding item to wishlist...');
       await _firestore
           .collection('wishlists')
           .doc(currentUser.uid)
@@ -788,10 +809,12 @@ class _ListingDetailsModal extends StatelessWidget {
         'addedAt': FieldValue.serverTimestamp(),
       });
 
+      print('SUCCESS: Item added to wishlist');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('$title added to wishlist!')),
       );
     } catch (e) {
+      print('ERROR adding to wishlist: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error adding to wishlist: $e')),
       );
@@ -825,11 +848,13 @@ class _ListingDetailsModal extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Listing Details',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: const Text(
+                      'Listing Details',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -1113,10 +1138,13 @@ class _ListingDetailsModal extends StatelessWidget {
                           }
                         }
                       },
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: const Text('Contact Seller'),
+                      icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                      label: const Text(
+                        'Contact',
+                        style: TextStyle(fontSize: 14),
+                      ),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
                       ),
                     ),
                   ),
@@ -1124,10 +1152,13 @@ class _ListingDetailsModal extends StatelessWidget {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => _addToWishlist(context),
-                      icon: const Icon(Icons.favorite_border),
-                      label: const Text('Add to Wishlist'),
+                      icon: const Icon(Icons.favorite_border, size: 18),
+                      label: const Text(
+                        'Wishlist',
+                        style: TextStyle(fontSize: 14),
+                      ),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
                       ),
                     ),
                   ),
