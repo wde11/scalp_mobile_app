@@ -1010,12 +1010,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () => _showCreateScavengerHuntDialog(context),
-                              icon: const Icon(Icons.add),
-                              label: const Text('Create New Item'),
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text(
+                                'Create',
+                                style: TextStyle(fontSize: 13),
+                              ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
                                 foregroundColor: Colors.deepOrange,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 8,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -1026,12 +1032,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () => _showManageScavengerHuntDialog(context),
-                              icon: const Icon(Icons.manage_search),
-                              label: const Text('Manage Items'),
+                              icon: const Icon(Icons.manage_search, size: 18),
+                              label: const Text(
+                                'Manage',
+                                style: TextStyle(fontSize: 13),
+                              ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white.withOpacity(0.2),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 8,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
