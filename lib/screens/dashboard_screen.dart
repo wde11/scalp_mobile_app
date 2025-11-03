@@ -1081,11 +1081,16 @@ class _DashboardScreenState extends State<DashboardScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.card_giftcard, color: Colors.deepOrange),
-              SizedBox(width: 8),
-              Text('Create Scavenger Hunt Item'),
+              const Icon(Icons.card_giftcard, color: Colors.deepOrange),
+              const SizedBox(width: 8),
+              Expanded(
+                child: const Text(
+                  'Create Scavenger Hunt Item',
+                  style: TextStyle(fontSize: 18),
+                ),
+              ),
             ],
           ),
           content: SingleChildScrollView(
