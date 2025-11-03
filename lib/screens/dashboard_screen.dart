@@ -909,7 +909,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ),
                   ),
                   const SizedBox(width: 16),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -917,16 +917,20 @@ class _DashboardScreenState extends State<DashboardScreen>
                           'Scavenger Hunt',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 24,
+                            fontSize: 22,
                             fontWeight: FontWeight.bold,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           'Manage treasure items',
                           style: TextStyle(
                             color: Colors.white70,
-                            fontSize: 14,
+                            fontSize: 13,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -1068,6 +1072,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     final priceController = TextEditingController();
     final descriptionController = TextEditingController();
     final quantityController = TextEditingController(text: '1');
+    final eventDurationController = TextEditingController(text: '60');
     double? selectedLat;
     double? selectedLng;
     XFile? selectedImage;
@@ -1193,6 +1198,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                       border: OutlineInputBorder(),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: eventDurationController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Event Duration (minutes)',
+                      border: OutlineInputBorder(),
+                      helperText: 'How long the event will last',
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: () async {
@@ -1307,6 +1322,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     latitude: selectedLat!,
                     longitude: selectedLng!,
                     quantity: int.parse(quantityController.text),
+                    eventDurationMinutes: int.tryParse(eventDurationController.text),
                   );
 
                   if (mounted) {

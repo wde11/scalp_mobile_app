@@ -11,6 +11,7 @@ class ScavengerHuntItem {
   final DateTime createdAt;
   final String? claimedBy;
   final DateTime? claimedAt;
+  final DateTime? eventEndTime; // Global event timer
 
   ScavengerHuntItem({
     required this.id,
@@ -25,6 +26,7 @@ class ScavengerHuntItem {
     required this.createdAt,
     this.claimedBy,
     this.claimedAt,
+    this.eventEndTime,
   });
 
   factory ScavengerHuntItem.fromMap(String id, Map<String, dynamic> map) {
@@ -41,6 +43,7 @@ class ScavengerHuntItem {
       createdAt: map['createdAt']?.toDate() ?? DateTime.now(),
       claimedBy: map['claimedBy'],
       claimedAt: map['claimedAt']?.toDate(),
+      eventEndTime: map['eventEndTime']?.toDate(),
     );
   }
 
@@ -57,10 +60,23 @@ class ScavengerHuntItem {
       'createdAt': createdAt,
       'claimedBy': claimedBy,
       'claimedAt': claimedAt,
+      'eventEndTime': eventEndTime,
     };
   }
 
   bool get isClaimed => claimedBy != null;
   
   bool isClaimedByUser(String userId) => claimedBy == userId;
+  
+  bool get isEventActive {
+    if (eventEndTime == null) return true;
+    return DateTime.now().isBefore(eventEndTime!);
+  }
+  
+  Duration? get timeRemaining {
+    if (eventEndTime == null) return null;
+    final now = DateTime.now();
+    if (now.isAfter(eventEndTime!)) return Duration.zero;
+    return eventEndTime!.difference(now);
+  }
 }

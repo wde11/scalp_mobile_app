@@ -99,8 +99,14 @@ class ScavengerHuntService {
     required double latitude,
     required double longitude,
     required int quantity,
+    int? eventDurationMinutes,
   }) async {
     try {
+      final now = DateTime.now();
+      final eventEndTime = eventDurationMinutes != null 
+          ? now.add(Duration(minutes: eventDurationMinutes))
+          : null;
+      
       await _firestore.collection('scavenger_hunt_items').add({
         'title': title,
         'price': price,
@@ -113,6 +119,7 @@ class ScavengerHuntService {
         'createdAt': FieldValue.serverTimestamp(),
         'claimedBy': null,
         'claimedAt': null,
+        'eventEndTime': eventEndTime,
       });
 
       // Send notification to all users
