@@ -959,7 +959,13 @@ class _ChatScreenState extends State<ChatScreen> {
                       });
                     },
                   )
-                : null,
+                : Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Image.asset(
+                      'assets/images/scalp_logo_w_v2.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
             title: _selectedUserId != null
                 ? Row(
                     children: [
@@ -1013,7 +1019,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     IconButton(
                       icon: const Icon(Icons.info_outline, color: Color(0xFF1F2030)),
                       onPressed: () {},
-                    )
+                    ),
                   ],
           ),
           body: SafeArea(
@@ -1404,6 +1410,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             final imageUrl = message['imageUrl'];
                             final locationData = message['location'];
                             final itemInquiry = message['itemInquiry'];
+                            final scavengerHuntInquiry = message['scavengerHuntInquiry'];
                             final itemAvailable = message['itemAvailable'];
                             final transaction = message['transaction'];
                             final isSystemMessage = message['systemMessage'] == true;
@@ -1435,6 +1442,13 @@ class _ChatScreenState extends State<ChatScreen> {
                                       avatar: avatarUrl,
                                       text: text,
                                       inquiryData: itemInquiry,
+                                    ),
+                                  if (!isSystemMessage && scavengerHuntInquiry != null)
+                                    _messageScavengerHuntInquiryRow(
+                                      isMe: isMe,
+                                      avatar: avatarUrl,
+                                      text: text,
+                                      inquiryData: scavengerHuntInquiry,
                                     ),
                                   if (!isSystemMessage && itemAvailable != null)
                                     _messageItemAvailableRow(
@@ -1901,129 +1915,86 @@ class _ChatScreenState extends State<ChatScreen> {
         if (!isMe) const SizedBox(width: 8),
         Flexible(
           child: Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.75,
-              minWidth: 200,
-            ),
+            constraints: const BoxConstraints(maxWidth: 300),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: bubbleColor,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              borderRadius: BorderRadius.circular(18),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                // Item Info Card
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      if (inquiryData['imageUrl'] != null)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            inquiryData['imageUrl'],
-                            width: 50,
-                            height: 50,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                width: 50,
-                                height: 50,
-                                color: Colors.grey[300],
-                                child: const Icon(Icons.image, size: 24, color: Colors.grey),
-                              );
-                            },
-                          ),
-                        ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              inquiryData['title'] ?? 'Item',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '₱${inquiryData['price']}',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.95),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
+                Row(
+                  children: [
+                    if (inquiryData['imageUrl'] != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          inquiryData['imageUrl'],
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
                         ),
                       ),
-                    ],
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            inquiryData['title'] ?? 'Item',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            '₱${inquiryData['price']}',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Text(
                   text,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 13,
+                    fontSize: 14,
                   ),
                 ),
                 // Quick reply buttons for seller (receiver of inquiry)
                 if (!isMe) ...[
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
+                  const SizedBox(height: 12),
+                  Row(
                     children: [
-                      ElevatedButton.icon(
-                        onPressed: () => _sendQuickReply('Yes, it is available!', inquiryData),
-                        icon: const Icon(Icons.check_circle, size: 14),
-                        label: const Text(
-                          'Available',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _sendQuickReply('Yes, it is available!', inquiryData),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
+                          child: const Text('✓ Available', style: TextStyle(fontSize: 12)),
                         ),
                       ),
-                      OutlinedButton.icon(
-                        onPressed: () => _sendQuickReply('Sorry, it\'s not available anymore.', null),
-                        icon: const Icon(Icons.cancel, size: 14),
-                        label: const Text(
-                          'Not Available',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white, width: 1.5),
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _sendQuickReply('Sorry, it\'s not available anymore.', null),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
+                          child: const Text('✗ Not Available', style: TextStyle(fontSize: 12)),
                         ),
                       ),
                     ],
@@ -2037,6 +2008,228 @@ class _ChatScreenState extends State<ChatScreen> {
         if (isMe) avatarWidget,
       ],
     );
+  }
+
+  Widget _messageScavengerHuntInquiryRow({
+    required bool isMe,
+    required String avatar,
+    required String text,
+    required Map<String, dynamic> inquiryData,
+  }) {
+    final alignment = isMe ? MainAxisAlignment.end : MainAxisAlignment.start;
+    final avatarWidget = CircleAvatar(radius: 16, backgroundImage: NetworkImage(avatar));
+    final bubbleColor = isMe ? const Color(0xFF3864FF) : Colors.orange;
+
+    return Row(
+      mainAxisAlignment: alignment,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (!isMe) avatarWidget,
+        if (!isMe) const SizedBox(width: 8),
+        Flexible(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 300),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: bubbleColor,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.card_giftcard, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Scavenger Hunt',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    if (inquiryData['imageUrl'] != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          inquiryData['imageUrl'],
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 60,
+                              height: 60,
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.card_giftcard),
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            inquiryData['title'] ?? 'Item',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '₱${(inquiryData['price'] ?? 0).toStringAsFixed(0)}',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                  ),
+                ),
+                // Quick reply buttons ONLY for seller (receiver of inquiry)
+                if (!isMe) ...[
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Update item status:',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _updateScavengerHuntStatus(inquiryData['itemId'], 'available'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                          ),
+                          child: const Text('✓ Available', style: TextStyle(fontSize: 11)),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _updateScavengerHuntStatus(inquiryData['itemId'], 'taken'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                          ),
+                          child: const Text('✗ Taken', style: TextStyle(fontSize: 11)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => _updateScavengerHuntStatus(inquiryData['itemId'], 'ended'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                      ),
+                      child: const Text('⏰ Event Ended', style: TextStyle(fontSize: 11)),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (isMe) const SizedBox(width: 8),
+        if (isMe) avatarWidget,
+      ],
+    );
+  }
+
+  Future<void> _updateScavengerHuntStatus(String itemId, String status) async {
+    if (_selectedChatId == null) return;
+
+    try {
+      // Update item status in Firestore
+      await _firestore.collection('scavenger_hunt_items').doc(itemId).update({
+        'status': status,
+      });
+
+      // Send status update message
+      String statusMessage;
+      if (status == 'available') {
+        statusMessage = '✅ Item is available!';
+      } else if (status == 'taken') {
+        statusMessage = '❌ Sorry, item has been taken.';
+      } else {
+        statusMessage = '⏰ Event has ended.';
+      }
+
+      // Send the status message
+      final messageData = {
+        'senderId': currentUser!.uid,
+        'text': statusMessage,
+        'timestamp': FieldValue.serverTimestamp(),
+        'read': false,
+        'scavengerHuntStatusUpdate': {
+          'itemId': itemId,
+          'status': status,
+        },
+      };
+
+      await _firestore
+          .collection('chats')
+          .doc(_selectedChatId)
+          .collection('messages')
+          .add(messageData);
+
+      await _firestore.collection('chats').doc(_selectedChatId).update({
+        'lastMessage': statusMessage,
+        'lastMessageTime': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Status updated to: $status'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _messageItemAvailableRow({
