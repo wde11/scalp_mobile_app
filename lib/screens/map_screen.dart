@@ -2,17 +2,18 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_places_flutter/google_places_flutter.dart';
+import 'package:google_places_flutter/model/prediction.dart';
 import 'package:scalp_mobile_app/models/location_data.dart';
-import 'package:scalp_mobile_app/models/transaction.dart' as models;
+import 'package:scalp_mobile_app/models/transaction.dart';
 import 'package:scalp_mobile_app/services/directions_service.dart';
 import 'package:scalp_mobile_app/services/scavenger_hunt_service.dart';
 import 'package:scalp_mobile_app/models/scavenger_hunt_item.dart';
 import 'package:scalp_mobile_app/globals.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class MapScreen extends StatefulWidget {
-  final models.Transaction? activeTransaction;
+  final Transaction? activeTransaction;
   final LocationData? sharedLocation;
   
   const MapScreen({super.key, this.activeTransaction, this.sharedLocation});
@@ -35,6 +36,7 @@ class _MapScreenState extends State<MapScreen> {
   final ScavengerHuntService _scavengerHuntService = ScavengerHuntService();
   List<ScavengerHuntItem> _scavengerHuntItems = [];
   bool _showScavengerHunt = true; // Toggle to show/hide scavenger hunt items
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -68,8 +70,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _loadScavengerHuntItems() {
-    // Load ALL items (not just active ones) so users can see all scavenger hunt items
-    _scavengerHuntService.getAllItems().listen((items) {
+    _scavengerHuntService.getActiveItems().listen((items) {
       if (mounted) {
         setState(() {
           _scavengerHuntItems = items;
@@ -152,32 +153,19 @@ class _MapScreenState extends State<MapScreen> {
     _markers.removeWhere((marker) => 
       marker.markerId.value.startsWith('scavenger_'));
 
-    // Add new scavenger hunt markers for ALL items (active and inactive)
+    // Add new scavenger hunt markers
     for (var item in _scavengerHuntItems) {
       final isClaimedByMe = _scavengerHuntService.isClaimedByCurrentUser(item);
       final isClaimed = item.isClaimed;
-      final isEventActive = item.isEventActive;
       
       // Determine marker color based on status
       BitmapDescriptor markerIcon;
-      String statusText;
-      
-      if (!isEventActive) {
-        // Event ended - grey marker
-        markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet);
-        statusText = "Event Ended";
-      } else if (isClaimedByMe) {
-        // Claimed by current user - green marker
+      if (isClaimedByMe) {
         markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
-        statusText = "Your Claim";
       } else if (isClaimed) {
-        // Claimed by someone else - red marker
         markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
-        statusText = "Taken";
       } else {
-        // Available - orange marker
         markerIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
-        statusText = "Available";
       }
 
       _markers.add(
@@ -187,7 +175,7 @@ class _MapScreenState extends State<MapScreen> {
           icon: markerIcon,
           infoWindow: InfoWindow(
             title: item.title,
-            snippet: '₱${item.price.toStringAsFixed(0)} - $statusText',
+            snippet: '₱${item.price.toStringAsFixed(0)} - ${isClaimed ? "Claimed" : "Available"}',
           ),
           onTap: () => _showScavengerHuntItemDetails(item),
         ),
@@ -202,732 +190,153 @@ class _MapScreenState extends State<MapScreen> {
   void _showScavengerHuntItemDetails(ScavengerHuntItem item) {
     final isClaimedByMe = _scavengerHuntService.isClaimedByCurrentUser(item);
     final isClaimed = item.isClaimed;
-    final isEventActive = item.isEventActive;
-    final timeRemaining = item.timeRemaining;
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => SingleChildScrollView(
-          controller: scrollController,
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Drag handle
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-
-                // Item image
-                if (item.imageUrl.isNotEmpty)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      item.imageUrl,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Item image
+            if (item.imageUrl.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  item.imageUrl,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
                       height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          height: 200,
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.image_not_supported, size: 50),
-                        );
-                      },
-                    ),
-                  ),
-                const SizedBox(height: 16),
-
-                // Title
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // Price
-                Text(
-                  '₱${item.price.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    color: Colors.green,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Description
-                Text(
-                  item.description,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Location Info
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue[200]!),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.location_on, color: Colors.blue, size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'Location',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Latitude: ${item.latitude.toStringAsFixed(6)}',
-                        style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                      ),
-                      Text(
-                        'Longitude: ${item.longitude.toStringAsFixed(6)}',
-                        style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Item Details
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    children: [
-                      _detailRow('Quantity', '${item.quantity}'),
-                      const Divider(),
-                      _detailRow('Status', item.isActive ? 'Active' : 'Inactive'),
-                      if (item.eventEndTime != null) ...[
-                        const Divider(),
-                        _detailRow(
-                          'Event Status',
-                          isEventActive ? 'Active' : 'Ended',
-                        ),
-                      ],
-                      if (timeRemaining != null && isEventActive) ...[
-                        const Divider(),
-                        _detailRow(
-                          'Time Remaining',
-                          _formatDuration(timeRemaining),
-                        ),
-                      ],
-                      const Divider(),
-                      _detailRow(
-                        'Created',
-                        _formatDate(item.createdAt),
-                      ),
-                      if (item.claimedAt != null) ...[
-                        const Divider(),
-                        _detailRow(
-                          'Claimed At',
-                          _formatDate(item.claimedAt!),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Status and action button
-                if (isClaimedByMe)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.green[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.check_circle, color: Colors.green[700]),
-                        const SizedBox(width: 8),
-                        Text(
-                          'You claimed this item!',
-                          style: TextStyle(
-                            color: Colors.green[700],
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else if (isClaimed)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.red[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.cancel, color: Colors.red[700]),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Already Claimed',
-                          style: TextStyle(
-                            color: Colors.red[700],
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else if (item.isActive && isEventActive)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _contactSeller(item),
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      label: const Text(
-                        'Contact Seller',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    decoration: BoxDecoration(
                       color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'Item Not Available',
-                      textAlign: TextAlign.center,
+                      child: const Icon(Icons.image_not_supported, size: 50),
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 16),
+
+            // Title
+            Text(
+              item.title,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Price
+            Text(
+              '₱${item.price.toStringAsFixed(0)}',
+              style: const TextStyle(
+                fontSize: 20,
+                color: Colors.green,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Description
+            Text(
+              item.description,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Status and action button
+            if (isClaimedByMe)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.green[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green[700]),
+                    const SizedBox(width: 8),
+                    Text(
+                      'You claimed this item!',
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: Colors.green[700],
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _detailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 14,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: Colors.grey[700],
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays == 0) {
-      if (difference.inHours == 0) {
-        return '${difference.inMinutes} min ago';
-      }
-      return '${difference.inHours} hr ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
-    } else {
-      return '${date.month}/${date.day}/${date.year}';
-    }
-  }
-
-  String _formatDuration(Duration duration) {
-    if (duration.inDays > 0) {
-      return '${duration.inDays}d ${duration.inHours.remainder(24)}h';
-    } else if (duration.inHours > 0) {
-      return '${duration.inHours}h ${duration.inMinutes.remainder(60)}m';
-    } else if (duration.inMinutes > 0) {
-      return '${duration.inMinutes}m';
-    } else {
-      return '${duration.inSeconds}s';
-    }
-  }
-
-  Future<void> _contactSeller(ScavengerHuntItem item) async {
-    Navigator.pop(context); // Close bottom sheet
-
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please log in to contact the seller'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      return;
-    }
-
-    if (currentUser.uid == item.userId) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('You cannot contact yourself!'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-      return;
-    }
-
-    try {
-      final firestore = FirebaseFirestore.instance;
-      
-      // Generate chat ID
-      final chatId = _generateChatId(currentUser.uid, item.userId);
-      
-      // Get or create chat
-      final chatDoc = await firestore.collection('chats').doc(chatId).get();
-      if (!chatDoc.exists) {
-        await firestore.collection('chats').doc(chatId).set({
-          'participants': [currentUser.uid, item.userId],
-          'createdAt': FieldValue.serverTimestamp(),
-          'lastMessage': '',
-          'lastMessageTime': FieldValue.serverTimestamp(),
-        });
-      }
-
-      // Send scavenger hunt inquiry message
-      final messageData = {
-        'senderId': currentUser.uid,
-        'text': 'Is this scavenger hunt item available?',
-        'timestamp': FieldValue.serverTimestamp(),
-        'read': false,
-        'scavengerHuntInquiry': {
-          'itemId': item.id,
-          'title': item.title,
-          'price': item.price,
-          'imageUrl': item.imageUrl,
-          'status': item.status,
-        },
-      };
-
-      await firestore
-          .collection('chats')
-          .doc(chatId)
-          .collection('messages')
-          .add(messageData);
-
-      await firestore.collection('chats').doc(chatId).update({
-        'lastMessage': 'Scavenger hunt inquiry: ${item.title}',
-        'lastMessageTime': FieldValue.serverTimestamp(),
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✉️ Message sent to seller! Check your chats.'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-        
-        // Navigate to chat screen after a short delay
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            Navigator.of(context).pushNamed('/chat');
-          }
-        });
-      }
-    } catch (e) {
-      print('Error contacting seller: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  String _generateChatId(String userId1, String userId2) {
-    final sortedIds = [userId1, userId2]..sort();
-    return '${sortedIds[0]}_${sortedIds[1]}';
-  }
-
-  void _showMyScavengerHuntItems() {
-    // Show all active scavenger hunt items with countdown timers
-    final activeItems = _scavengerHuntItems.where((item) => 
-      item.isActive && item.isEventActive
-    ).toList();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.orange.shade400, Colors.deepOrange.shade500],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  ],
                 ),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Column(
-                children: [
-                  // Drag handle
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(2),
+              )
+            else if (isClaimed)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.red[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.cancel, color: Colors.red[700]),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Already Claimed',
+                      style: TextStyle(
+                        color: Colors.red[700],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
-                  ),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.card_giftcard, color: Colors.white, size: 24),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Active Scavenger Hunt',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            Text(
-                              '${activeItems.length} items available',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.white.withOpacity(0.9),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
+              )
+            else
+              ElevatedButton(
+                onPressed: () => _claimItem(item),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                  backgroundColor: const Color(0xFF3864FF),
+                ),
+                child: const Text(
+                  'Claim Item',
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
               ),
-            ),
-            
-            // Content
-            Expanded(
-              child: activeItems.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.card_giftcard_outlined,
-                              size: 80,
-                              color: Colors.grey[300],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No Active Items',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Check back later for new\nscavenger hunt items!',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      controller: scrollController,
-                      padding: const EdgeInsets.all(16),
-                      itemCount: activeItems.length,
-                      itemBuilder: (context, index) {
-                        final item = activeItems[index];
-                        final isClaimedByMe = _scavengerHuntService.isClaimedByCurrentUser(item);
-                        final timeRemaining = item.timeRemaining;
-                        
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.pop(context);
-                              // Zoom to item location
-                              _mapController.animateCamera(
-                                CameraUpdate.newLatLngZoom(
-                                  LatLng(item.latitude, item.longitude),
-                                  17,
-                                ),
-                              );
-                              // Show item details
-                              Future.delayed(const Duration(milliseconds: 500), () {
-                                _showScavengerHuntItemDetails(item);
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Row(
-                                children: [
-                                  // Item Image
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: item.imageUrl.isNotEmpty
-                                        ? Image.network(
-                                            item.imageUrl,
-                                            width: 70,
-                                            height: 70,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Container(
-                                                width: 70,
-                                                height: 70,
-                                                color: Colors.grey[300],
-                                                child: const Icon(Icons.image_not_supported, size: 30),
-                                              );
-                                            },
-                                          )
-                                        : Container(
-                                            width: 70,
-                                            height: 70,
-                                            color: Colors.grey[300],
-                                            child: const Icon(Icons.card_giftcard, size: 30),
-                                          ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  
-                                  // Item Details
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          item.title,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            Icon(Icons.monetization_on, size: 16, color: Colors.green[700]),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              '₱${item.price.toStringAsFixed(0)}',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.green[700],
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        // Countdown Timer
-                                        if (timeRemaining != null)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: timeRemaining.inMinutes < 30 
-                                                  ? Colors.red[100] 
-                                                  : Colors.blue[100],
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(
-                                                  Icons.timer,
-                                                  size: 14,
-                                                  color: timeRemaining.inMinutes < 30 
-                                                      ? Colors.red[700] 
-                                                      : Colors.blue[700],
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  _formatDuration(timeRemaining),
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: timeRemaining.inMinutes < 30 
-                                                        ? Colors.red[700] 
-                                                        : Colors.blue[700],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  
-                                  // Status Badge
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: isClaimedByMe 
-                                          ? Colors.green[100]
-                                          : item.isClaimed 
-                                              ? Colors.red[100]
-                                              : Colors.orange[100],
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          isClaimedByMe 
-                                              ? Icons.check_circle 
-                                              : item.isClaimed 
-                                                  ? Icons.cancel 
-                                                  : Icons.card_giftcard,
-                                          size: 14,
-                                          color: isClaimedByMe 
-                                              ? Colors.green[700]
-                                              : item.isClaimed 
-                                                  ? Colors.red[700]
-                                                  : Colors.orange[700],
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          isClaimedByMe 
-                                              ? 'Yours'
-                                              : item.isClaimed 
-                                                  ? 'Taken'
-                                                  : 'Open',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: isClaimedByMe 
-                                                ? Colors.green[700]
-                                                : item.isClaimed 
-                                                    ? Colors.red[700]
-                                                    : Colors.orange[700],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _claimItem(ScavengerHuntItem item) async {
+    Navigator.pop(context); // Close bottom sheet
+
+    final success = await _scavengerHuntService.claimItem(item.id);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? '🎉 Item claimed successfully!'
+                : 'Failed to claim item. It may have been claimed by someone else.',
+          ),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -935,7 +344,92 @@ class _MapScreenState extends State<MapScreen> {
     if (_mapReady) {
       _mapController.dispose();
     }
+    _searchController.dispose();
     super.dispose();
+  }
+  
+  Future<void> _searchAndNavigateToPlace(Prediction prediction) async {
+    try {
+      // Get place details using geocoding
+      final locations = await locationFromAddress(prediction.description ?? '');
+      
+      if (locations.isNotEmpty && mounted) {
+        final location = locations.first;
+        final searchedLatLng = LatLng(location.latitude, location.longitude);
+        
+        setState(() {
+          _searchController.clear();
+          
+          // Add marker for searched location
+          _markers.removeWhere((marker) => marker.markerId.value == 'searched_location');
+          _markers.add(
+            Marker(
+              markerId: const MarkerId('searched_location'),
+              position: searchedLatLng,
+              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+              infoWindow: InfoWindow(
+                title: 'Searched Location',
+                snippet: prediction.description,
+              ),
+            ),
+          );
+        });
+        
+        // Animate to the searched location
+        _mapController.animateCamera(
+          CameraUpdate.newLatLngZoom(searchedLatLng, 15),
+        );
+        
+        // Optionally draw route to searched location
+        if (_currentLocation != searchedLatLng) {
+          await _drawRouteToSearchedLocation(searchedLatLng, prediction.description ?? 'Searched Location');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error finding location: $e')),
+        );
+      }
+    }
+  }
+  
+  Future<void> _drawRouteToSearchedLocation(LatLng destination, String locationName) async {
+    try {
+      final directionsData = await _directionsService.getDirections(
+        origin: _currentLocation,
+        destination: destination,
+      );
+
+      if (directionsData != null && mounted) {
+        final polylineCoordinates = directionsData['polylineCoordinates'] as List<LatLng>;
+        
+        setState(() {
+          _polylines.clear();
+          
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('searched_route'),
+              points: polylineCoordinates,
+              color: Colors.purple,
+              width: 5,
+            ),
+          );
+
+          _routeDistance = directionsData['distance'] as String?;
+          _routeDuration = directionsData['duration'] as String?;
+          _destinationName = locationName;
+        });
+
+        _fitMapToBounds(polylineCoordinates);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error drawing route: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _getUserLocation() async {
@@ -1201,9 +695,107 @@ class _MapScreenState extends State<MapScreen> {
             zoomControlsEnabled: false,
           ),
 
+          // Search Bar
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: GooglePlaceAutoCompleteTextField(
+                textEditingController: _searchController,
+                googleAPIKey: dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '',
+                inputDecoration: InputDecoration(
+                  hintText: 'Search for a place...',
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  prefixIcon: const Icon(Icons.search, color: Color(0xFF3864FF)),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, color: Colors.grey),
+                          onPressed: () {
+                            setState(() {
+                              _searchController.clear();
+                              // Remove searched location marker
+                              _markers.removeWhere((marker) => 
+                                marker.markerId.value == 'searched_location');
+                              // Clear route if it was to a searched location
+                              if (_polylines.any((p) => p.polylineId.value == 'searched_route')) {
+                                _clearRoute();
+                              }
+                            });
+                          },
+                        )
+                      : null,
+                ),
+                debounceTime: 600,
+                countries: const ["ph"], // Philippines only, remove to search globally
+                isLatLngRequired: true,
+                getPlaceDetailWithLatLng: (Prediction prediction) {
+                  _searchAndNavigateToPlace(prediction);
+                },
+                itemClick: (Prediction prediction) {
+                  _searchController.text = prediction.description ?? '';
+                  _searchController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: _searchController.text.length),
+                  );
+                },
+                seperatedBuilder: const Divider(height: 1),
+                containerHorizontalPadding: 10,
+                itemBuilder: (context, index, Prediction prediction) {
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on, color: Color(0xFF3864FF)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                prediction.structuredFormatting?.mainText ?? '',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (prediction.structuredFormatting?.secondaryText != null)
+                                Text(
+                                  prediction.structuredFormatting!.secondaryText!,
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
           if (hasActiveTransaction)
             Positioned(
-              top: 50,
+              top: 80,
               left: 16,
               right: 16,
               child: Card(
@@ -1370,7 +962,7 @@ class _MapScreenState extends State<MapScreen> {
           else if (widget.sharedLocation != null && _destinationName.isNotEmpty)
             // Shared location info card
             Positioned(
-              top: 50,
+              top: 80,
               left: 16,
               right: 16,
               child: Card(
@@ -1535,7 +1127,7 @@ class _MapScreenState extends State<MapScreen> {
           else
             // Only current location (no destination)
             Positioned(
-              top: 50,
+              top: 80,
               left: 16,
               right: 16,
               child: Card(
@@ -1595,94 +1187,43 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
 
-          // Scavenger hunt legend and active items button
+          // Scavenger hunt legend
           if (_showScavengerHunt && _scavengerHuntItems.isNotEmpty)
             Positioned(
-              bottom: 220,
-              left: 16,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Active Items Button
-                  Material(
-                    elevation: 4,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      onTap: _showMyScavengerHuntItems,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.orange.shade400, Colors.deepOrange.shade500],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.list_alt, color: Colors.white, size: 20),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Active Items',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
+              bottom: 150,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Scavenger Hunt',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Legend
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.info_outline, size: 16, color: Colors.grey[700]),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'Item Status',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        _legendItem(Colors.orange, 'Available', 'Ready to claim'),
-                        const SizedBox(height: 6),
-                        _legendItem(Colors.green, 'Your Claims', 'Items you claimed'),
-                        const SizedBox(height: 6),
-                        _legendItem(Colors.red, 'Taken', 'Claimed by others'),
-                        const SizedBox(height: 6),
-                        _legendItem(Colors.grey, 'Ended', 'Event expired'),
-                      ],
-                    ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    _legendItem(Colors.orange, 'Available'),
+                    const SizedBox(height: 4),
+                    _legendItem(Colors.green, 'Yours'),
+                    const SizedBox(height: 4),
+                    _legendItem(Colors.red, 'Claimed'),
+                  ],
+                ),
               ),
             ),
 
@@ -1748,62 +1289,20 @@ class _MapScreenState extends State<MapScreen> {
               ],
             ),
           ),
-          // Scalp Logo in top-left corner
-          Positioned(
-            top: 40,
-            left: 16,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Image.asset(
-                'assets/images/scalp_logo_w_v2.png',
-                height: 32,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _legendItem(Color color, String label, [String? description]) {
+  Widget _legendItem(Color color, String label) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(Icons.location_on, color: color, size: 16),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (description != null)
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: Colors.grey[600],
-                  ),
-                ),
-            ],
-          ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10),
         ),
       ],
     );

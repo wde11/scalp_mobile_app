@@ -27,10 +27,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final ScavengerHuntService _scavengerHuntService = ScavengerHuntService();
-  final cloudinary = CloudinaryPublic('dp5mqhd9w', 'scalp_preset', cache: false);
+  final cloudinary = CloudinaryPublic('dk6k4xkqw', 'ml_default', cache: false);
   
   int _itemsSoldCount = 0;
-  int _wishlistItemsCount = 0;
+  int _itemsBoughtCount = 0;
   
   User? get currentUser => _auth.currentUser;
 
@@ -60,17 +60,17 @@ class _DashboardScreenState extends State<DashboardScreen>
           .where('isSold', isEqualTo: true)
           .get();
       
-      // Count wishlist items
-      final wishlistSnapshot = await _firestore
-          .collection('wishlists')
-          .doc(currentUser!.uid)
-          .collection('items')
+      // Count bought items (transactions where user is the buyer and completed)
+      final boughtSnapshot = await _firestore
+          .collection('transactions')
+          .where('buyerId', isEqualTo: currentUser!.uid)
+          .where('status', isEqualTo: 'completed')
           .get();
       
       if (mounted) {
         setState(() {
           _itemsSoldCount = soldSnapshot.docs.length;
-          _wishlistItemsCount = wishlistSnapshot.docs.length;
+          _itemsBoughtCount = boughtSnapshot.docs.length;
         });
       }
     } catch (e) {
@@ -225,7 +225,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
   
-  void _showWishlistItemsDialog(BuildContext context) {
+  void _showBoughtItemsDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -239,7 +239,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'My Wishlist',
+                      'Items Bought',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -257,9 +257,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                 child: StreamBuilder<QuerySnapshot>(
                   stream: currentUser != null
                       ? _firestore
-                          .collection('wishlists')
-                          .doc(currentUser!.uid)
-                          .collection('items')
+                          .collection('transactions')
+                          .where('buyerId', isEqualTo: currentUser!.uid)
+                          .where('status', isEqualTo: 'completed')
                           .snapshots()
                       : null,
                   builder: (context, snapshot) {
@@ -272,7 +272,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         child: Padding(
                           padding: const EdgeInsets.all(24.0),
                           child: Text(
-                            'Error loading wishlist: ${snapshot.error}',
+                            'Error loading bought items: ${snapshot.error}',
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.red),
                           ),
@@ -285,7 +285,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         child: Padding(
                           padding: EdgeInsets.all(24.0),
                           child: Text(
-                            'No items in wishlist yet.\nAdd items to see them here!',
+                            'No purchases yet.\nBuy items to see them here!',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.grey),
                           ),
@@ -293,13 +293,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                       );
                     }
                     
-                    // Sort by addedAt on client side
-                    final wishlistItems = snapshot.data!.docs.toList();
-                    wishlistItems.sort((a, b) {
+                    // Sort by createdAt on client side
+                    final transactions = snapshot.data!.docs.toList();
+                    transactions.sort((a, b) {
                       final aData = a.data() as Map<String, dynamic>;
                       final bData = b.data() as Map<String, dynamic>;
-                      final aTime = aData['addedAt'] as Timestamp?;
-                      final bTime = bData['addedAt'] as Timestamp?;
+                      final aTime = aData['createdAt'] as Timestamp?;
+                      final bTime = bData['createdAt'] as Timestamp?;
                       
                       if (aTime == null && bTime == null) return 0;
                       if (aTime == null) return 1;
@@ -310,14 +310,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                     
                     return ListView.builder(
                       padding: const EdgeInsets.all(8),
-                      itemCount: wishlistItems.length,
+                      itemCount: transactions.length,
                       itemBuilder: (context, index) {
-                        final doc = wishlistItems[index];
+                        final doc = transactions[index];
                         final data = doc.data() as Map<String, dynamic>;
-                        final title = data['title'] ?? 'Unknown Item';
-                        final price = data['price'] ?? 0.0;
-                        final imageUrl = data['imageUrl'] ?? 'assets/images/placeholder.png';
-                        final addedAt = data['addedAt'] as Timestamp?;
+                        final createdAt = data['createdAt'] as Timestamp?;
+                        final completedAt = data['completedAt'] as Timestamp?;
+                        final withLocation = data['withMeetupLocation'] as bool? ?? false;
+                        final status = data['status'] ?? 'pending';
                         
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -328,25 +328,53 @@ class _DashboardScreenState extends State<DashboardScreen>
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
                                 image: DecorationImage(
-                                  image: imageUrl.startsWith('assets/')
-                                      ? const AssetImage('assets/images/placeholder.png') as ImageProvider
-                                      : NetworkImage(imageUrl),
+                                  image: data['itemImageUrl'] != null && !data['itemImageUrl'].toString().startsWith('assets/')
+                                      ? NetworkImage(data['itemImageUrl'])
+                                      : const AssetImage('images/placeholder.png') as ImageProvider,
                                   fit: BoxFit.cover,
                                 ),
                               ),
                             ),
                             title: Text(
-                              title,
+                              data['itemTitle'] ?? 'No Title',
                               style: const TextStyle(fontWeight: FontWeight.bold),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (addedAt != null)
+                                if (status == 'completed')
+                                  const Row(
+                                    children: [
+                                      Icon(Icons.check_circle, size: 14, color: Colors.green),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Completed ✓',
+                                        style: TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                if (withLocation)
+                                  const Row(
+                                    children: [
+                                      Icon(Icons.location_on, size: 14, color: Colors.blue),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Meetup arranged',
+                                        style: TextStyle(fontSize: 12, color: Colors.blue),
+                                      ),
+                                    ],
+                                  ),
+                                if (completedAt != null)
                                   Text(
-                                    'Added: ${_formatDate(addedAt.toDate())}',
+                                    'Completed: ${_formatDate(completedAt.toDate())}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  )
+                                else if (createdAt != null)
+                                  Text(
+                                    'Created: ${_formatDate(createdAt.toDate())}',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey,
@@ -354,85 +382,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   ),
                               ],
                             ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '₱${price.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.red,
-                                    size: 20,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
-                                    minWidth: 32,
-                                    minHeight: 32,
-                                  ),
-                                  onPressed: () async {
-                                    final confirm = await showDialog<bool>(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('Remove from Wishlist'),
-                                        content: Text('Remove "$title" from your wishlist?'),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context, false),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context, true),
-                                            child: const Text(
-                                              'Remove',
-                                              style: TextStyle(color: Colors.red),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-
-                                    if (confirm == true && currentUser != null) {
-                                      try {
-                                        await _firestore
-                                            .collection('wishlists')
-                                            .doc(currentUser!.uid)
-                                            .collection('items')
-                                            .doc(doc.id)
-                                            .delete();
-                                        
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Item removed from wishlist'),
-                                            ),
-                                          );
-                                        }
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text('Error: $e'),
-                                            ),
-                                          );
-                                        }
-                                      }
-                                    }
-                                  },
-                                ),
-                              ],
+                            trailing: Text(
+                              '₱${data['itemPrice']?.toString() ?? '0'}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                                fontSize: 16,
+                              ),
                             ),
-                            onTap: () {
-                              Navigator.of(context).pop();
-                              context.push('/listing');
-                            },
                           ),
                         );
                       },
@@ -476,13 +433,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     final screenWidth = MediaQuery.of(context).size.width;
     return Scaffold(
       appBar: AppBar(
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Image.asset(
-            'assets/images/scalp_logo_w_v2.png',
-            fit: BoxFit.contain,
-          ),
-        ),
         title: const Text('Welcome Back'),
         actions: [
           IconButton(
@@ -509,10 +459,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                     Expanded(
                       child: _buildStatCard(
                         context,
-                        'Wishlist Items',
-                        _wishlistItemsCount.toString(),
+                        'Items Bought',
+                        _itemsBoughtCount.toString(),
                         'Updated just now',
-                        Icons.favorite,
+                        Icons.shopping_cart,
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -569,8 +519,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           onTap: () {
             if (title == 'Items sold') {
               _showSoldItemsDialog(context);
-            } else if (title == 'Wishlist Items') {
-              _showWishlistItemsDialog(context);
+            } else if (title == 'Items Bought') {
+              _showBoughtItemsDialog(context);
             } else {
               showDialog(
                 context: context,
@@ -909,7 +859,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ),
                   ),
                   const SizedBox(width: 16),
-                  Expanded(
+                  const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -917,20 +867,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                           'Scavenger Hunt',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 16,
+                            fontSize: 24,
                             fontWeight: FontWeight.bold,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           'Manage treasure items',
                           style: TextStyle(
                             color: Colors.white70,
-                            fontSize: 11,
+                            fontSize: 14,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -1014,18 +960,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () => _showCreateScavengerHuntDialog(context),
-                              icon: const Icon(Icons.add, size: 18),
-                              label: const Text(
-                                'Create',
-                                style: TextStyle(fontSize: 13),
-                              ),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Create New Item'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
                                 foregroundColor: Colors.deepOrange,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                  horizontal: 8,
-                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -1036,18 +976,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () => _showManageScavengerHuntDialog(context),
-                              icon: const Icon(Icons.manage_search, size: 18),
-                              label: const Text(
-                                'Manage',
-                                style: TextStyle(fontSize: 13),
-                              ),
+                              icon: const Icon(Icons.manage_search),
+                              label: const Text('Manage Items'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white.withOpacity(0.2),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                  horizontal: 8,
-                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -1072,7 +1006,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     final priceController = TextEditingController();
     final descriptionController = TextEditingController();
     final quantityController = TextEditingController(text: '1');
-    final eventDurationController = TextEditingController(text: '60');
     double? selectedLat;
     double? selectedLng;
     XFile? selectedImage;
@@ -1080,284 +1013,388 @@ class _DashboardScreenState extends State<DashboardScreen>
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Row(
-            children: [
-              const Icon(Icons.card_giftcard, color: Colors.deepOrange),
-              const SizedBox(width: 8),
-              Expanded(
-                child: const Text(
-                  'Create Scavenger Hunt Item',
-                  style: TextStyle(fontSize: 18),
-                ),
-              ),
-            ],
+        builder: (context, setState) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-          content: SingleChildScrollView(
-            child: SizedBox(
-              width: 500,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Image Picker
-                  GestureDetector(
-                    onTap: () async {
-                      final ImagePicker picker = ImagePicker();
-                      try {
-                        final XFile? image = await picker.pickImage(
-                          source: ImageSource.gallery,
-                          imageQuality: 85,
-                          maxWidth: 1024,
-                        );
-                        if (image != null) {
-                          setState(() {
-                            selectedImage = image;
-                          });
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error picking image: $e')),
-                          );
-                        }
-                      }
-                    },
-                    child: Container(
-                      height: 120,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(8),
+          child: Container(
+            constraints: const BoxConstraints(
+              maxWidth: 500,
+              maxHeight: 700,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.deepOrange.withOpacity(0.1),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.card_giftcard, color: Colors.deepOrange, size: 28),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Create Scavenger Hunt',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                      child: selectedImage != null
-                          ? kIsWeb
-                              ? FutureBuilder<Uint8List>(
-                                  future: selectedImage!.readAsBytes(),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.hasData) {
-                                      return ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.memory(
-                                          snapshot.data!,
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                ),
+                // Content
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Image Picker
+                        GestureDetector(
+                          onTap: () async {
+                            final ImagePicker picker = ImagePicker();
+                            try {
+                              final XFile? image = await picker.pickImage(
+                                source: ImageSource.gallery,
+                                imageQuality: 85,
+                                maxWidth: 1024,
+                              );
+                              if (image != null) {
+                                setState(() {
+                                  selectedImage = image;
+                                });
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error picking image: $e')),
+                                );
+                              }
+                            }
+                          },
+                          child: Container(
+                            height: 140,
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300, width: 2),
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.grey.shade50,
+                            ),
+                            child: selectedImage != null
+                                ? kIsWeb
+                                    ? FutureBuilder<Uint8List>(
+                                        future: selectedImage!.readAsBytes(),
+                                        builder: (context, snapshot) {
+                                          if (snapshot.hasData) {
+                                            return ClipRRect(
+                                              borderRadius: BorderRadius.circular(12),
+                                              child: Image.memory(
+                                                snapshot.data!,
+                                                fit: BoxFit.cover,
+                                                width: double.infinity,
+                                              ),
+                                            );
+                                          }
+                                          return const Center(child: CircularProgressIndicator());
+                                        },
+                                      )
+                                    : ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.file(
+                                          File(selectedImage!.path),
                                           fit: BoxFit.cover,
                                           width: double.infinity,
                                         ),
-                                      );
-                                    }
-                                    return const Center(child: CircularProgressIndicator());
-                                  },
-                                )
-                              : ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(
-                                    File(selectedImage!.path),
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
+                                      )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey.shade400),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Tap to add image',
+                                        style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                                      ),
+                                    ],
                                   ),
-                                )
-                          : const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_photo_alternate, size: 32, color: Colors.grey),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Tap to add image',
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                              ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: titleController,
+                          decoration: InputDecoration(
+                            labelText: 'Item Title',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: titleController,
-                    decoration: const InputDecoration(
-                      labelText: 'Item Title',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: priceController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Prize Amount (₱)',
-                      border: OutlineInputBorder(),
-                      prefixText: '₱',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: descriptionController,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'Description',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: quantityController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Quantity',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: eventDurationController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Event Duration (minutes)',
-                      border: OutlineInputBorder(),
-                      helperText: 'How long the event will last',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      try {
-                        LocationPermission permission = await Geolocator.checkPermission();
-                        if (permission == LocationPermission.denied) {
-                          permission = await Geolocator.requestPermission();
-                        }
-                        
-                        if (permission == LocationPermission.denied || 
-                            permission == LocationPermission.deniedForever) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Location permission denied')),
-                            );
-                          }
-                          return;
-                        }
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: priceController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Prize Amount',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                            prefixText: '₱ ',
+                            prefixStyle: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: descriptionController,
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            labelText: 'Description',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                            alignLabelWithHint: true,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: quantityController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Quantity',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey.shade50,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            try {
+                              LocationPermission permission = await Geolocator.checkPermission();
+                              if (permission == LocationPermission.denied) {
+                                permission = await Geolocator.requestPermission();
+                              }
+                              
+                              if (permission == LocationPermission.denied || 
+                                  permission == LocationPermission.deniedForever) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Location permission denied')),
+                                  );
+                                }
+                                return;
+                              }
 
-                        final position = await Geolocator.getCurrentPosition();
-                        setState(() {
-                          selectedLat = position.latitude;
-                          selectedLng = position.longitude;
-                        });
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e')),
-                          );
-                        }
-                      }
-                    },
-                    icon: Icon(selectedLat != null ? Icons.check_circle : Icons.my_location),
-                    label: Text(
-                      selectedLat != null 
-                          ? 'Location Set: ${selectedLat!.toStringAsFixed(4)}, ${selectedLng!.toStringAsFixed(4)}'
-                          : 'Set Current Location',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: selectedLat != null ? Colors.green : Colors.blue,
-                      foregroundColor: Colors.white,
+                              final position = await Geolocator.getCurrentPosition();
+                              setState(() {
+                                selectedLat = position.latitude;
+                                selectedLng = position.longitude;
+                              });
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error getting location: $e')),
+                                );
+                              }
+                            }
+                          },
+                          icon: Icon(
+                            selectedLat != null ? Icons.check_circle : Icons.location_on,
+                            color: selectedLat != null ? Colors.green : null,
+                          ),
+                          label: Text(
+                            selectedLat != null ? 'Location Set' : 'Set Location',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: selectedLat != null 
+                                ? Colors.green.withOpacity(0.1) 
+                                : null,
+                            foregroundColor: selectedLat != null 
+                                ? Colors.green 
+                                : null,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+                // Action Buttons
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(20),
+                      bottomRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            if (titleController.text.isEmpty || 
+                                priceController.text.isEmpty ||
+                                selectedLat == null ||
+                                selectedImage == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please fill all fields')),
+                              );
+                              return;
+                            }
+
+                            // Close dialog first
+                            Navigator.pop(context);
+                            
+                            // Show loading indicator
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    ),
+                                    SizedBox(width: 16),
+                                    Text('Creating scavenger hunt...'),
+                                  ],
+                                ),
+                                duration: Duration(seconds: 10),
+                              ),
+                            );
+
+                            try {
+                              String imageUrl = 'https://via.placeholder.com/400x300?text=Scavenger+Hunt';
+
+                              // Upload image if selected
+                              if (selectedImage != null) {
+                                try {
+                                  CloudinaryFile? cloudinaryFile;
+                                  if (kIsWeb) {
+                                    final bytes = await selectedImage!.readAsBytes();
+                                    final fileName = '${DateTime.now().millisecondsSinceEpoch}_${selectedImage!.name}';
+                                    cloudinaryFile = CloudinaryFile.fromBytesData(
+                                      bytes,
+                                      identifier: fileName,
+                                      resourceType: CloudinaryResourceType.Image,
+                                    );
+                                  } else {
+                                    cloudinaryFile = CloudinaryFile.fromFile(
+                                      selectedImage!.path,
+                                      folder: 'scavenger_hunt',
+                                      resourceType: CloudinaryResourceType.Image,
+                                    );
+                                  }
+                                  final response = await cloudinary.uploadFile(cloudinaryFile);
+                                  imageUrl = response.secureUrl;
+                                } catch (uploadError) {
+                                  print('Image upload failed: $uploadError');
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).clearSnackBars();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Image upload failed. Using placeholder.'),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+
+                              await _scavengerHuntService.createScavengerHuntItem(
+                                title: titleController.text,
+                                price: double.parse(priceController.text),
+                                description: descriptionController.text,
+                                imageUrl: imageUrl,
+                                latitude: selectedLat!,
+                                longitude: selectedLng!,
+                                quantity: int.parse(quantityController.text),
+                              );
+
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).clearSnackBars();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Scavenger hunt created!'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).clearSnackBars();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: $e')),
+                                );
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.check, size: 18),
+                          label: const Text('Create Hunt'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.deepOrange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (titleController.text.isEmpty || 
-                    priceController.text.isEmpty ||
-                    selectedLat == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please fill all required fields and set location')),
-                  );
-                  return;
-                }
-
-                // Save context reference before async gap
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-                final navigator = Navigator.of(context);
-
-                try {
-                  // Close dialog first
-                  navigator.pop();
-                  
-                  // Show loading message
-                  scaffoldMessenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('Creating scavenger hunt item...'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-
-                  String imageUrl = 'https://via.placeholder.com/400x300?text=Scavenger+Hunt';
-
-                  // Upload image if selected
-                  if (selectedImage != null) {
-                    try {
-                      CloudinaryFile? cloudinaryFile;
-                      if (kIsWeb) {
-                        final bytes = await selectedImage!.readAsBytes();
-                        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${selectedImage!.name}';
-                        cloudinaryFile = CloudinaryFile.fromBytesData(
-                          bytes,
-                          identifier: fileName,
-                          resourceType: CloudinaryResourceType.Image,
-                        );
-                      } else {
-                        cloudinaryFile = CloudinaryFile.fromFile(
-                          selectedImage!.path,
-                          folder: 'scavenger_hunt',
-                          resourceType: CloudinaryResourceType.Image,
-                        );
-                      }
-                      final response = await cloudinary.uploadFile(cloudinaryFile);
-                      imageUrl = response.secureUrl;
-                      print('Image uploaded successfully: $imageUrl');
-                    } catch (uploadError) {
-                      print('Image upload failed: $uploadError');
-                      // Continue with placeholder - don't fail the whole operation
-                    }
-                  }
-
-                  await _scavengerHuntService.createScavengerHuntItem(
-                    title: titleController.text,
-                    price: double.parse(priceController.text),
-                    description: descriptionController.text,
-                    imageUrl: imageUrl,
-                    latitude: selectedLat!,
-                    longitude: selectedLng!,
-                    quantity: int.parse(quantityController.text),
-                    eventDurationMinutes: int.tryParse(eventDurationController.text),
-                  );
-
-                  scaffoldMessenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('Scavenger hunt item created successfully!'),
-                      backgroundColor: Colors.green,
-                      duration: Duration(seconds: 3),
-                    ),
-                  );
-                } catch (e) {
-                  print('Error creating scavenger hunt item: $e');
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(
-                      content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
-                      duration: Duration(seconds: 3),
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepOrange,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Create & Notify Users'),
-            ),
-          ],
         ),
       ),
     );
@@ -1376,13 +1413,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                      child: const Text(
-                        'Manage Scavenger Hunt Items',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    const Text(
+                      'Manage Scavenger Hunt Items',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     IconButton(
@@ -1395,23 +1430,10 @@ class _DashboardScreenState extends State<DashboardScreen>
               const Divider(height: 1),
               Expanded(
                 child: StreamBuilder<List<ScavengerHuntItem>>(
-                  stream: _scavengerHuntService.getMyItems(),
+                  stream: _scavengerHuntService.getAllItems(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
-                    }
-
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Text(
-                            'Error loading items: ${snapshot.error}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      );
                     }
 
                     if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -1436,12 +1458,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                         return Card(
                           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                           child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                            onTap: () => _showScavengerHuntItemDetailsDialog(context, item),
                             leading: item.imageUrl.isNotEmpty
                                 ? Container(
-                                    width: 50,
-                                    height: 50,
+                                    width: 60,
+                                    height: 60,
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(8),
                                       image: DecorationImage(
@@ -1451,59 +1471,46 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     ),
                                   )
                                 : Container(
-                                    width: 50,
-                                    height: 50,
+                                    width: 60,
+                                    height: 60,
                                     decoration: BoxDecoration(
                                       color: Colors.grey[300],
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: const Icon(Icons.card_giftcard, size: 26),
+                                    child: const Icon(Icons.card_giftcard),
                                   ),
                             title: Text(
                               item.title,
                               style: const TextStyle(fontWeight: FontWeight.bold),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  '₱${item.price.toStringAsFixed(0)}',
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                                const SizedBox(height: 4),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 4,
+                                Text('₱${item.price.toStringAsFixed(0)}'),
+                                Row(
                                   children: [
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          item.isActive ? Icons.check_circle : Icons.cancel,
-                                          size: 12,
-                                          color: item.isActive ? Colors.green : Colors.red,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          item.isActive ? 'Active' : 'Inactive',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: item.isActive ? Colors.green : Colors.red,
-                                          ),
-                                        ),
-                                      ],
+                                    Icon(
+                                      item.isActive ? Icons.check_circle : Icons.cancel,
+                                      size: 14,
+                                      color: item.isActive ? Colors.green : Colors.red,
                                     ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      item.isActive ? 'Active' : 'Inactive',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: item.isActive ? Colors.green : Colors.red,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
                                     if (item.isClaimed)
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                      const Row(
                                         children: [
-                                          const Icon(Icons.person, size: 12, color: Colors.orange),
-                                          const SizedBox(width: 4),
-                                          const Text(
+                                          Icon(Icons.person, size: 14, color: Colors.orange),
+                                          SizedBox(width: 4),
+                                          Text(
                                             'Claimed',
-                                            style: TextStyle(fontSize: 11, color: Colors.orange),
+                                            style: TextStyle(fontSize: 12, color: Colors.orange),
                                           ),
                                         ],
                                       ),
@@ -1511,46 +1518,38 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 ),
                               ],
                             ),
-                            trailing: SizedBox(
-                              width: 75,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Transform.scale(
-                                    scale: 0.55,
-                                    child: Switch(
-                                      value: item.isActive,
-                                      onChanged: (value) async {
-                                        try {
-                                          await _scavengerHuntService.toggleItemStatus(
-                                            item.id,
-                                            value,
-                                          );
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  value ? 'Item activated' : 'Item deactivated',
-                                                ),
-                                              ),
-                                            );
-                                          }
-                                        } catch (e) {
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(content: Text('Error: $e')),
-                                            );
-                                          }
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red, size: 15),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                                    onPressed: () async {
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Switch(
+                                  value: item.isActive,
+                                  onChanged: (value) async {
+                                    try {
+                                      await _scavengerHuntService.toggleItemStatus(
+                                        item.id,
+                                        value,
+                                      );
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              value ? 'Item activated' : 'Item deactivated',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Error: $e')),
+                                        );
+                                      }
+                                    }
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () async {
                                     final confirmed = await showDialog<bool>(
                                       context: context,
                                       builder: (context) => AlertDialog(
@@ -1600,7 +1599,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 ),
                               ],
                             ),
-                            ),
                           ),
                         );
                       },
@@ -1613,324 +1611,5 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
       ),
     );
-  }
-
-  void _showScavengerHuntItemDetailsDialog(BuildContext context, ScavengerHuntItem item) {
-    final isEventActive = item.isEventActive;
-    final timeRemaining = item.timeRemaining;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => Dialog(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    border: Border(bottom: BorderSide(color: Colors.blue[200]!)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Scavenger Hunt Item Details',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(dialogContext),
-                      ),
-                    ],
-                  ),
-                ),
-
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Item image
-                      if (item.imageUrl.isNotEmpty)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            item.imageUrl,
-                            height: 200,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                height: 200,
-                                color: Colors.grey[300],
-                                child: const Icon(Icons.image_not_supported, size: 50),
-                              );
-                            },
-                          ),
-                        ),
-                      const SizedBox(height: 16),
-
-                      // Title
-                      Text(
-                        item.title,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Price
-                      Text(
-                        '₱${item.price.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          color: Colors.green,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Description
-                      Text(
-                        item.description,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Location Info
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.blue[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue[200]!),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.location_on, color: Colors.blue, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Location',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Latitude: ${item.latitude.toStringAsFixed(6)}',
-                              style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                            ),
-                            Text(
-                              'Longitude: ${item.longitude.toStringAsFixed(6)}',
-                              style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Item Details
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          children: [
-                            _buildDetailRow('Quantity', '${item.quantity}'),
-                            const Divider(),
-                            _buildDetailRow('Status', item.isActive ? 'Active' : 'Inactive'),
-                            const Divider(),
-                            _buildDetailRow(
-                              'Claim Status',
-                              item.isClaimed ? 'Claimed' : 'Available',
-                            ),
-                            if (item.claimedBy != null) ...[
-                              const Divider(),
-                              _buildDetailRow('Claimed By', item.claimedBy!),
-                            ],
-                            if (item.eventEndTime != null) ...[
-                              const Divider(),
-                              _buildDetailRow(
-                                'Event Status',
-                                isEventActive ? 'Active' : 'Ended',
-                              ),
-                            ],
-                            if (timeRemaining != null && isEventActive) ...[
-                              const Divider(),
-                              _buildDetailRow(
-                                'Time Remaining',
-                                _formatDuration(timeRemaining),
-                              ),
-                            ],
-                            const Divider(),
-                            _buildDetailRow(
-                              'Created',
-                              _formatDate(item.createdAt),
-                            ),
-                            if (item.claimedAt != null) ...[
-                              const Divider(),
-                              _buildDetailRow(
-                                'Claimed At',
-                                _formatDate(item.claimedAt!),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Status badges
-                      Row(
-                        children: [
-                          if (item.isActive)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.green[100],
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.check_circle, size: 16, color: Colors.green[700]),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Active',
-                                    style: TextStyle(
-                                      color: Colors.green[700],
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          else
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.red[100],
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.cancel, size: 16, color: Colors.red[700]),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Inactive',
-                                    style: TextStyle(
-                                      color: Colors.red[700],
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          const SizedBox(width: 8),
-                          if (item.isClaimed)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.orange[100],
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.person, size: 16, color: Colors.orange[700]),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Claimed',
-                                    style: TextStyle(
-                                      color: Colors.orange[700],
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: Colors.grey[700],
-                fontSize: 14,
-              ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    if (duration.inDays > 0) {
-      return '${duration.inDays}d ${duration.inHours.remainder(24)}h';
-    } else if (duration.inHours > 0) {
-      return '${duration.inHours}h ${duration.inMinutes.remainder(60)}m';
-    } else if (duration.inMinutes > 0) {
-      return '${duration.inMinutes}m';
-    } else {
-      return '${duration.inSeconds}s';
-    }
   }
 }

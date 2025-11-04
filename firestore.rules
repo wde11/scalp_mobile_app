@@ -14,12 +14,12 @@ service cloud.firestore {
       );
     }
 
-    // Wishlists collection
-    match /wishlists/{userId} {
+    // Carts collection
+    match /carts/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      // Items subcollection within a user's wishlist
-      match /items/{wishlistItemId} {
+      // Items subcollection within a user's cart
+      match /items/{cartItemId} {
         allow read, create, update, delete: if request.auth != null && request.auth.uid == userId;
       }
     }
@@ -74,50 +74,14 @@ service cloud.firestore {
 
     // Scavenger Hunt Items collection
     match /scavenger_hunt_items/{itemId} {
-      // Authenticated users can read all scavenger hunt items (global view)
+      // Authenticated users can read all scavenger hunt items
       allow read: if request.auth != null;
       
-      // Only authenticated users can create scavenger hunt items
-      // Must include userId matching the creator
-      // Validates required fields
-      allow create: if request.auth != null &&
-                       request.resource.data.userId == request.auth.uid &&
-                       request.resource.data.keys().hasAll(['userId', 'title', 'price', 'description', 'imageUrl', 
-                                                            'latitude', 'longitude', 'quantity', 'isActive', 'createdAt', 'status']) &&
-                       request.resource.data.title is string &&
-                       request.resource.data.title.size() > 0 &&
-                       request.resource.data.price is number &&
-                       request.resource.data.price >= 0 &&
-                       request.resource.data.quantity is int &&
-                       request.resource.data.quantity > 0 &&
-                       request.resource.data.isActive is bool &&
-                       request.resource.data.latitude is number &&
-                       request.resource.data.longitude is number &&
-                       request.resource.data.status in ['available', 'taken', 'ended'];
+      // Only authenticated users can claim/update items
+      allow update: if request.auth != null;
       
-      // Users can update items:
-      // 1. Only the creator (userId matches) can toggle isActive status or delete
-      // 2. Only the creator can update status field ('available', 'taken', 'ended')
-      // 3. Only the creator can update other item details (title, description, price, etc.)
-      allow update: if request.auth != null && 
-                       resource.data.userId == request.auth.uid && (
-                         // Toggling active/inactive status
-                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isActive']) ||
-                         
-                         // Updating item status (available, taken, ended)
-                         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
-                          request.resource.data.status in ['available', 'taken', 'ended']) ||
-                         
-                         // Updating item details
-                         request.resource.data.diff(resource.data).affectedKeys().hasAny(['title', 'description', 'price', 'quantity', 'eventEndTime']) ||
-                         
-                         // Updating claimed status (for backward compatibility)
-                         request.resource.data.diff(resource.data).affectedKeys().hasAny(['claimedBy', 'claimedAt'])
-                       );
-      
-      // Only the creator (userId matches) can delete their own scavenger hunt items
-      allow delete: if request.auth != null && 
-                       resource.data.userId == request.auth.uid;
+      // Only authenticated users can create items
+      allow create: if request.auth != null;
     }
     
     // Transactions collection
