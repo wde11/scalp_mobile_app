@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 
 // PC-related categories for the dropdown menu (re-using from listing_screen.dart)
 const List<String> pcCategories = [
@@ -229,7 +230,13 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
   Widget build(BuildContext context) {
     if (currentUser == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('My Items')),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text('My Items'),
+        ),
         body: const Center(
           child: Text('Please log in to view your items.'),
         ),
@@ -238,12 +245,9 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Image.asset(
-            'assets/images/scalp_logo_w_v2.png',
-            fit: BoxFit.contain,
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
         ),
         title: const Text('My Items'),
       ),

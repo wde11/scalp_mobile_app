@@ -114,12 +114,9 @@ class _MyWishlistScreenState extends State<MyWishlistScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Image.asset(
-            'assets/images/scalp_logo_w_v2.png',
-            fit: BoxFit.contain,
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
         ),
         title: const Text('My Wishlist'),
       ),
