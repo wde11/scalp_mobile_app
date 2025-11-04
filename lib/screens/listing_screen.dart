@@ -42,6 +42,7 @@ class ListingScreen extends StatefulWidget {
 class _ListingScreenState extends State<ListingScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  bool _showFreeItems = false; // Toggle between free and for-sale items
 
   Future<void> _deleteListing(String listingId) async {
     final confirmed = await showDialog<bool>(
@@ -230,14 +231,32 @@ class _ListingScreenState extends State<ListingScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Recent',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Text(
+                  _showFreeItems ? 'Free Items' : 'Items for Sale',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Flexible(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      Flexible(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _showFreeItems = !_showFreeItems;
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            backgroundColor: _showFreeItems ? Colors.green : Colors.blue,
+                          ),
+                          child: Text(
+                            _showFreeItems ? 'Show For Sale' : 'Show Free',
+                            style: const TextStyle(fontSize: 12, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
                       Flexible(
                         child: ElevatedButton(
                           onPressed: () {
@@ -261,23 +280,14 @@ class _ListingScreenState extends State<ListingScreen> {
                           child: const Text('My Items', style: TextStyle(fontSize: 12)),
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            // TODO: Implement filter logic
-                          },
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          ),
-                          child: const Text('Filter', style: TextStyle(fontSize: 12)),
-                        ),
-                      ),
                     ],
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            const Divider(thickness: 1, height: 1),
+            const SizedBox(height: 12),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: _firestore
@@ -297,16 +307,30 @@ class _ListingScreenState extends State<ListingScreen> {
                     return const Center(child: Text('No listings available'));
                   }
 
-                  // Filter out sold items on client side
+                  final currentUserId = _auth.currentUser?.uid;
+                  
+                  // Filter out sold items, own items, and filter by free/for-sale
                   final availableListings = snapshot.data!.docs
                       .where((doc) {
                         final data = doc.data() as Map<String, dynamic>;
-                        return data['isSold'] != true;
+                        final isSold = data['isSold'] == true;
+                        final isOwnItem = data['userId'] == currentUserId;
+                        final price = data['price'] ?? 0.0;
+                        final isFree = price == 0.0;
+                        
+                        // Filter logic: exclude sold items, exclude own items, and match free/for-sale filter
+                        return !isSold && !isOwnItem && (isFree == _showFreeItems);
                       })
                       .toList();
 
                   if (availableListings.isEmpty) {
-                    return const Center(child: Text('No listings available'));
+                    return Center(
+                      child: Text(
+                        _showFreeItems 
+                          ? 'No free items available' 
+                          : 'No items for sale available'
+                      ),
+                    );
                   }
 
                   return GridView.builder(
@@ -320,13 +344,17 @@ class _ListingScreenState extends State<ListingScreen> {
                     itemBuilder: (context, index) {
                       final listing = availableListings[index];
                       final data = listing.data() as Map<String, dynamic>;
+                      final price = data['price'] ?? 0.0;
+                      final priceText = price == 0.0 ? 'FREE' : '₱${price.toString()}';
+                      
                       return _buildListItem(
                         context,
                         data['title'] ?? 'No Title',
                         data['category'] ?? 'No Category',
-                        '₱${data['price']?.toString() ?? '0'}',
+                        priceText,
                         data['imageUrl'] ?? 'assets/images/placeholder.png',
                         isOwner: _auth.currentUser?.uid == data['userId'],
+                        isFree: price == 0.0,
                         onTap: () => _showListingDetails(context, listing),
                         onEdit: () => _showEditListingDialog(listing),
                         onDelete: () => _deleteListing(listing.id),
@@ -359,6 +387,7 @@ class _ListingScreenState extends State<ListingScreen> {
     String price,
     String imagePath, {
     bool isOwner = false,
+    bool isFree = false,
     VoidCallback? onTap,
     VoidCallback? onEdit,
     VoidCallback? onDelete,
@@ -410,9 +439,10 @@ class _ListingScreenState extends State<ListingScreen> {
                     const SizedBox(height: 4),
                     Text(
                       price,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.green,
+                        color: isFree ? Colors.orange : Colors.green,
+                        fontSize: isFree ? 18 : 16,
                       ),
                     ),
                   ],
@@ -477,6 +507,7 @@ class _CreateListingModalState extends State<_CreateListingModal> {
   String? _selectedCategory;
   XFile? _selectedImage;
   bool _isLoading = false;
+  bool _isFree = false; // New field for free items
 
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
@@ -521,12 +552,18 @@ class _CreateListingModalState extends State<_CreateListingModal> {
 
     final title = _titleController.text.trim();
     final description = _descriptionController.text.trim();
-    final price = double.tryParse(_priceController.text.trim());
+    final price = _isFree ? 0.0 : double.tryParse(_priceController.text.trim());
 
-    if (title.isEmpty || _selectedCategory == null || description.isEmpty || price == null) {
+    if (title.isEmpty || _selectedCategory == null || description.isEmpty || (!_isFree && price == null)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill all fields correctly')),
+          SnackBar(
+            content: Text(
+              _isFree 
+                ? 'Please fill all fields correctly' 
+                : 'Please fill all fields correctly and enter a valid price'
+            ),
+          ),
         );
       }
       return;
@@ -580,7 +617,8 @@ class _CreateListingModalState extends State<_CreateListingModal> {
         'title': title,
         'category': _selectedCategory,
         'description': description,
-        'price': price,
+        'price': price ?? 0.0,
+        'isFree': _isFree,
         'imageUrl': imageUrl,
         'userId': user.uid,
         'createdAt': FieldValue.serverTimestamp(),
@@ -706,12 +744,32 @@ class _CreateListingModalState extends State<_CreateListingModal> {
               maxLines: 3,
             ),
             const SizedBox(height: 16.0),
+            Row(
+              children: [
+                Checkbox(
+                  value: _isFree,
+                  onChanged: (bool? value) {
+                    setState(() {
+                      _isFree = value ?? false;
+                      if (_isFree) {
+                        _priceController.clear();
+                      }
+                    });
+                  },
+                ),
+                const Text('This item is FREE'),
+              ],
+            ),
+            const SizedBox(height: 8.0),
             TextField(
               controller: _priceController,
-              decoration: const InputDecoration(
-                labelText: 'Price',
+              enabled: !_isFree,
+              decoration: InputDecoration(
+                labelText: _isFree ? 'Price (FREE)' : 'Price',
                 prefixText: '₱',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
+                filled: _isFree,
+                fillColor: _isFree ? Colors.grey[200] : null,
               ),
               keyboardType: TextInputType.number,
             ),
@@ -826,7 +884,8 @@ class _ListingDetailsModal extends StatelessWidget {
     final data = listing.data() as Map<String, dynamic>;
     final title = data['title'] ?? 'No Title';
     final category = data['category'] ?? 'No Category';
-    final price = data['price']?.toString() ?? '0';
+    final price = data['price'] ?? 0.0;
+    final isFree = price == 0.0;
     final description = data['description'] ?? 'No description available';
     final imageUrl = data['imageUrl'] ?? 'assets/images/placeholder.png';
     final userId = data['userId'];
@@ -944,18 +1003,18 @@ class _ListingDetailsModal extends StatelessWidget {
                     // Price
                     Row(
                       children: [
-                        const Icon(
-                          Icons.attach_money,
-                          color: Colors.green,
+                        Icon(
+                          isFree ? Icons.card_giftcard : Icons.attach_money,
+                          color: isFree ? Colors.orange : Colors.green,
                           size: 32,
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '₱$price',
-                          style: const TextStyle(
+                          isFree ? 'FREE' : '₱$price',
+                          style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
-                            color: Colors.green,
+                            color: isFree ? Colors.orange : Colors.green,
                           ),
                         ),
                       ],
@@ -1124,8 +1183,9 @@ class _ListingDetailsModal extends StatelessWidget {
                           if (context.mounted) {
                             Navigator.of(context).pop(); // Close listing details
                             // Navigate to home with chat parameters and listing data for quick inquiry
+                            final displayPrice = isFree ? 'FREE' : price.toString();
                             context.replace(
-                              '/?chatId=$chatId&userId=$userId&listingId=${listing.id}&listingTitle=${Uri.encodeComponent(title)}&listingPrice=$price&listingImage=${Uri.encodeComponent(imageUrl)}'
+                              '/?chatId=$chatId&userId=$userId&listingId=${listing.id}&listingTitle=${Uri.encodeComponent(title)}&listingPrice=$displayPrice&listingImage=${Uri.encodeComponent(imageUrl)}'
                             );
                           }
                         } catch (e) {
