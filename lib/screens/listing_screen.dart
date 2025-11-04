@@ -43,6 +43,15 @@ class _ListingScreenState extends State<ListingScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _showFreeItems = false; // Toggle between free and for-sale items
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _deleteListing(String listingId) async {
     final confirmed = await showDialog<bool>(
@@ -217,9 +226,36 @@ class _ListingScreenState extends State<ListingScreen> {
             fit: BoxFit.contain,
           ),
         ),
-        title: const Text('Listing'),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Search listings...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: Colors.white54),
+                ),
+                style: const TextStyle(color: Colors.black, fontSize: 18),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.toLowerCase();
+                  });
+                },
+              )
+            : const Text('Listing'),
         actions: [
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
+          IconButton(
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                _isSearching = !_isSearching;
+                if (!_isSearching) {
+                  _searchController.clear();
+                  _searchQuery = '';
+                }
+              });
+            },
+          ),
           IconButton(icon: const Icon(Icons.person), onPressed: () {}),
         ],
       ),
@@ -318,17 +354,31 @@ class _ListingScreenState extends State<ListingScreen> {
                         final price = data['price'] ?? 0.0;
                         final isFree = price == 0.0;
                         
-                        // Filter logic: exclude sold items, exclude own items, and match free/for-sale filter
-                        return !isSold && !isOwnItem && (isFree == _showFreeItems);
+                        // Search filter
+                        bool matchesSearch = true;
+                        if (_searchQuery.isNotEmpty) {
+                          final title = (data['title'] ?? '').toString().toLowerCase();
+                          final category = (data['category'] ?? '').toString().toLowerCase();
+                          final description = (data['description'] ?? '').toString().toLowerCase();
+                          
+                          matchesSearch = title.contains(_searchQuery) ||
+                                         category.contains(_searchQuery) ||
+                                         description.contains(_searchQuery);
+                        }
+                        
+                        // Filter logic: exclude sold items, exclude own items, match free/for-sale filter, and match search
+                        return !isSold && !isOwnItem && (isFree == _showFreeItems) && matchesSearch;
                       })
                       .toList();
 
                   if (availableListings.isEmpty) {
                     return Center(
                       child: Text(
-                        _showFreeItems 
-                          ? 'No free items available' 
-                          : 'No items for sale available'
+                        _searchQuery.isNotEmpty
+                          ? 'No results found for "$_searchQuery"'
+                          : (_showFreeItems 
+                              ? 'No free items available' 
+                              : 'No items for sale available')
                       ),
                     );
                   }
