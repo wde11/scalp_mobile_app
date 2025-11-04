@@ -1722,7 +1722,7 @@ class _ListingDetailsModal extends StatelessWidget {
                           ),
                           const SizedBox(width: 16),
                           Text(
-                            isFree ? 'FREE' : '₱$price',
+                            isFree ? 'FREE' : '$price',
                             style: TextStyle(
                               fontSize: 32,
                               fontWeight: FontWeight.bold,
