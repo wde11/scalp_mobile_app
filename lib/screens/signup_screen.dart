@@ -95,12 +95,7 @@ class _SignupScreenState extends State<SignupScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[200],
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.pop(),
-        ),
+        title: const Text('Sign up'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -112,12 +107,15 @@ class _SignupScreenState extends State<SignupScreen> {
               children: <Widget>[
                 const SizedBox(height: 32.0),
                 Text(
-                  'Register',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  'Create Account',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 16.0),
                 Text(
-                  'Create an account to continue!',
+                  'Sign up to get started!',
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 32.0),
