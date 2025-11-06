@@ -663,90 +663,154 @@ class _DashboardScreenState extends State<DashboardScreen>
       tag: 'special_event',
       child: Material(
         color: Colors.transparent,
-        child: GestureDetector(
-          onTap: () {
-            // Navigate to map tab (index 2)
-            if (widget.onNavigateToTab != null) {
-              widget.onNavigateToTab!(2);
-            } else {
-              context.push('/map');
+        child: StreamBuilder<List<ScavengerHuntItem>>(
+          stream: _scavengerHuntService.getAllItems(),
+          builder: (context, snapshot) {
+            // Get the latest active event
+            ScavengerHuntItem? latestEvent;
+            if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+              final activeEvents = snapshot.data!
+                  .where((item) => item.isActive && item.isEventActive)
+                  .toList();
+              
+              if (activeEvents.isNotEmpty) {
+                // Sort by creation date to get the latest
+                activeEvents.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+                latestEvent = activeEvents.first;
+              }
             }
-          },
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                image: DecorationImage(
-                  image: const AssetImage('assets/images/bangkerohan.jpg'),
-                  fit: BoxFit.cover,
-                  colorFilter: ColorFilter.mode(
-                    Colors.black.withOpacity(0.4),
-                    BlendMode.darken,
-                  ),
-                ),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
+
+            return GestureDetector(
+              onTap: () {
+                // Navigate to map tab (index 2)
+                if (widget.onNavigateToTab != null) {
+                  widget.onNavigateToTab!(2);
+                } else {
+                  context.push('/map');
+                }
+              },
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
-                  gradient: LinearGradient(
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                    colors: [
-                      theme.colorScheme.primary.withOpacity(0.7),
-                      Colors.black.withOpacity(0.4),
-                    ],
-                  ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'SPECIAL EVENT',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    image: DecorationImage(
+                      image: const AssetImage('assets/images/bangkerohan.jpg'),
+                      fit: BoxFit.cover,
+                      colorFilter: ColorFilter.mode(
+                        Colors.black.withOpacity(0.4),
+                        BlendMode.darken,
+                      ),
+                    ),
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      gradient: LinearGradient(
+                        begin: Alignment.topRight,
+                        end: Alignment.bottomLeft,
+                        colors: [
+                          theme.colorScheme.primary.withOpacity(0.7),
+                          Colors.black.withOpacity(0.4),
+                        ],
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              latestEvent != null ? 'LIVE EVENT' : 'NO ACTIVE EVENT',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 12),
+                          if (latestEvent != null) ...[
+                            // Live Timer
+                            StreamBuilder(
+                              stream: Stream.periodic(const Duration(seconds: 1)),
+                              builder: (context, snapshot) {
+                                final timeRemaining = latestEvent!.timeRemaining;
+                                String timerText = 'Event Ended';
+                                
+                                if (timeRemaining != null && timeRemaining > Duration.zero) {
+                                  final hours = timeRemaining.inHours.toString().padLeft(2, '0');
+                                  final minutes = (timeRemaining.inMinutes % 60).toString().padLeft(2, '0');
+                                  final seconds = (timeRemaining.inSeconds % 60).toString().padLeft(2, '0');
+                                  timerText = '$hours:$minutes:$seconds';
+                                }
+                                
+                                return Text(
+                                  timerText,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black.withOpacity(0.5),
+                                        blurRadius: 10,
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              latestEvent.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ] else ...[
+                            const Text(
+                              '--:--:--',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'No active treasure hunt events at the moment',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        '10:32:10',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Treasure Hunt in Downtown, starting soon!',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
