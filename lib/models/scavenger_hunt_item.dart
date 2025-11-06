@@ -81,10 +81,18 @@ class ScavengerHuntItem {
     return DateTime.now().isBefore(eventEndTime!);
   }
   
+  bool get isExpired {
+    if (eventEndTime == null) return false;
+    return DateTime.now().isAfter(eventEndTime!);
+  }
+  
   Duration? get timeRemaining {
     if (eventEndTime == null) return null;
     final now = DateTime.now();
     if (now.isAfter(eventEndTime!)) return Duration.zero;
     return eventEndTime!.difference(now);
   }
+  
+  // Check if item should be shown (active and not expired)
+  bool get isAvailable => isActive && isEventActive && !isExpired;
 }

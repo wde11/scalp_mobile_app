@@ -666,12 +666,20 @@ class _DashboardScreenState extends State<DashboardScreen>
         child: StreamBuilder<List<ScavengerHuntItem>>(
           stream: _scavengerHuntService.getAllItems(),
           builder: (context, snapshot) {
-            // Get the latest active event
+            // Get the latest active event (not expired)
             ScavengerHuntItem? latestEvent;
             if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+              // Filter out expired events
               final activeEvents = snapshot.data!
-                  .where((item) => item.isActive && item.isEventActive)
+                  .where((item) => item.isAvailable && !item.isExpired)
                   .toList();
+              
+              // Deactivate expired events in the background
+              for (var item in snapshot.data!) {
+                if (item.isExpired && item.isActive) {
+                  _scavengerHuntService.deactivateExpiredItem(item.id);
+                }
+              }
               
               if (activeEvents.isNotEmpty) {
                 // Sort by creation date to get the latest
@@ -745,7 +753,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                             StreamBuilder(
                               stream: Stream.periodic(const Duration(seconds: 1)),
                               builder: (context, snapshot) {
-                                final timeRemaining = latestEvent!.timeRemaining;
+                                final event = latestEvent!; // Safe to use ! here because we checked != null above
+                                final timeRemaining = event.timeRemaining;
                                 String timerText = 'Event Ended';
                                 
                                 if (timeRemaining != null && timeRemaining > Duration.zero) {
@@ -753,6 +762,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   final minutes = (timeRemaining.inMinutes % 60).toString().padLeft(2, '0');
                                   final seconds = (timeRemaining.inSeconds % 60).toString().padLeft(2, '0');
                                   timerText = '$hours:$minutes:$seconds';
+                                } else if (timeRemaining == Duration.zero || event.isExpired) {
+                                  // Deactivate the item when timer reaches zero
+                                  _scavengerHuntService.deactivateExpiredItem(event.id);
                                 }
                                 
                                 return Text(
@@ -1006,8 +1018,19 @@ class _DashboardScreenState extends State<DashboardScreen>
                 stream: _scavengerHuntService.getAllItems(),
                 builder: (context, snapshot) {
                   final items = snapshot.data ?? [];
-                  final activeItems = items.where((item) => item.isActive).length;
-                  final claimedItems = items.where((item) => item.isClaimed).length;
+                  
+                  // Filter out expired items and deactivate them
+                  final availableItems = items.where((item) => !item.isExpired).toList();
+                  
+                  // Deactivate expired items in the background
+                  for (var item in items) {
+                    if (item.isExpired && item.isActive) {
+                      _scavengerHuntService.deactivateExpiredItem(item.id);
+                    }
+                  }
+                  
+                  final activeItems = availableItems.where((item) => item.isActive).length;
+                  final claimedItems = availableItems.where((item) => item.isClaimed).length;
                   
                   return Column(
                     children: [
@@ -1140,6 +1163,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     double? selectedLat;
     double? selectedLng;
     XFile? selectedImage;
+    bool isFree = false;
 
     showDialog(
       context: context,
@@ -1240,13 +1264,59 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ),
                   ),
                   const SizedBox(height: 12),
+                  // FREE checkbox
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isFree ? Colors.orange.shade50 : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isFree ? Colors.orange.shade200 : Colors.grey.shade300,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: isFree,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              isFree = value ?? false;
+                              if (isFree) {
+                                priceController.text = '0';
+                              }
+                            });
+                          },
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        Icon(
+                          Icons.card_giftcard_rounded,
+                          color: isFree ? Colors.orange.shade600 : Colors.grey.shade600,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'This is a FREE item (no prize)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: isFree ? Colors.orange.shade700 : Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: priceController,
+                    enabled: !isFree,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Prize Amount (₱)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: isFree ? 'Prize Amount (FREE)' : 'Prize Amount (₱)',
+                      border: const OutlineInputBorder(),
                       prefixText: '₱',
+                      filled: true,
+                      fillColor: isFree ? Colors.grey.shade200 : null,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1332,10 +1402,16 @@ class _DashboardScreenState extends State<DashboardScreen>
             ElevatedButton(
               onPressed: () async {
                 if (titleController.text.isEmpty || 
-                    priceController.text.isEmpty ||
+                    (!isFree && priceController.text.isEmpty) ||
                     selectedLat == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please fill all required fields and set location')),
+                    SnackBar(
+                      content: Text(
+                        isFree 
+                          ? 'Please fill all required fields and set location'
+                          : 'Please fill all required fields, enter a prize amount, and set location'
+                      ),
+                    ),
                   );
                   return;
                 }
@@ -1386,9 +1462,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                     }
                   }
 
+                  final price = isFree ? 0.0 : double.parse(priceController.text);
+
                   await _scavengerHuntService.createScavengerHuntItem(
                     title: titleController.text,
-                    price: double.parse(priceController.text),
+                    price: price,
                     description: descriptionController.text,
                     imageUrl: imageUrl,
                     latitude: selectedLat!,
@@ -1398,8 +1476,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                   );
 
                   scaffoldMessenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('Scavenger hunt item created successfully!'),
+                    SnackBar(
+                      content: Text(
+                        isFree 
+                          ? 'FREE scavenger hunt item created successfully!'
+                          : 'Scavenger hunt item created successfully!'
+                      ),
                       backgroundColor: Colors.green,
                       duration: Duration(seconds: 3),
                     ),
