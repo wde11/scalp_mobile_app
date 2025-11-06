@@ -10,6 +10,7 @@ import 'package:scalp_mobile_app/services/directions_service.dart';
 import 'package:scalp_mobile_app/services/scavenger_hunt_service.dart';
 import 'package:scalp_mobile_app/models/scavenger_hunt_item.dart';
 import 'package:scalp_mobile_app/globals.dart';
+import 'dart:async';
 
 class MapScreen extends StatefulWidget {
   final models.Transaction? activeTransaction;
@@ -22,7 +23,7 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  late GoogleMapController _mapController;
+  GoogleMapController? _mapController;
   LatLng _currentLocation = const LatLng(7.0779, 125.5997);
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
@@ -35,6 +36,8 @@ class _MapScreenState extends State<MapScreen> {
   final ScavengerHuntService _scavengerHuntService = ScavengerHuntService();
   List<ScavengerHuntItem> _scavengerHuntItems = [];
   bool _showScavengerHunt = true; // Toggle to show/hide scavenger hunt items
+  StreamSubscription<List<ScavengerHuntItem>>? _scavengerHuntSubscription;
+  bool _isDisposed = false;
 
   @override
   void initState() {
@@ -69,18 +72,21 @@ class _MapScreenState extends State<MapScreen> {
 
   void _loadScavengerHuntItems() {
     // Load ALL items (not just active ones) so users can see all scavenger hunt items
-    _scavengerHuntService.getAllItems().listen((items) {
-      if (mounted) {
+    _scavengerHuntSubscription?.cancel();
+    _scavengerHuntSubscription = _scavengerHuntService.getAllItems().listen((items) {
+      if (mounted && !_isDisposed) {
         setState(() {
           _scavengerHuntItems = items;
           _updateScavengerHuntMarkers();
         });
       }
+    }, onError: (error) {
+      print('Error loading scavenger hunt items: $error');
     });
   }
 
   Future<void> _handleSharedLocation() async {
-    if (widget.sharedLocation == null || !_mapReady) return;
+    if (widget.sharedLocation == null || !_mapReady || _mapController == null) return;
     
     final sharedLoc = widget.sharedLocation!;
     final sharedLatLng = LatLng(sharedLoc.latitude, sharedLoc.longitude);
@@ -107,13 +113,15 @@ class _MapScreenState extends State<MapScreen> {
           address = sharedLoc.address;
         }
         
-        setState(() {
-          _destinationName = address;
-        });
+        if (mounted && !_isDisposed) {
+          setState(() {
+            _destinationName = address;
+          });
+        }
       }
     } catch (e) {
       // Fall back to the provided address
-      if (mounted) {
+      if (mounted && !_isDisposed) {
         setState(() {
           _destinationName = sharedLoc.address;
         });
@@ -121,23 +129,24 @@ class _MapScreenState extends State<MapScreen> {
     }
     
     // Add marker for the shared location
-    setState(() {
-      _markers.removeWhere((marker) => marker.markerId.value == 'shared_location');
-      _markers.add(
-        Marker(
-          markerId: const MarkerId('shared_location'),
-          position: sharedLatLng,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-          infoWindow: InfoWindow(
-            title: 'Shared Location',
-            snippet: _destinationName,
+    if (mounted && !_isDisposed) {
+      setState(() {
+        _markers.removeWhere((marker) => marker.markerId.value == 'shared_location');
+        _markers.add(
+          Marker(
+            markerId: const MarkerId('shared_location'),
+            position: sharedLatLng,
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+            infoWindow: InfoWindow(
+              title: 'Shared Location',
+              snippet: _destinationName,
+            ),
           ),
-        ),
-      );
-    });
-    
+        );
+      });
+    }
     // Animate camera to the shared location
-    _mapController.animateCamera(
+    _mapController?.animateCamera(
       CameraUpdate.newLatLngZoom(sharedLatLng, 15),
     );
     
@@ -146,17 +155,20 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _updateScavengerHuntMarkers() async {
-    if (!_showScavengerHunt || !_mapReady) return;
+    if (!_showScavengerHunt || !_mapReady || _isDisposed) return;
 
-    // Remove old scavenger hunt markers
-    _markers.removeWhere((marker) => 
-      marker.markerId.value.startsWith('scavenger_'));
+    try {
+      // Remove old scavenger hunt markers
+      _markers.removeWhere((marker) => 
+        marker.markerId.value.startsWith('scavenger_'));
 
-    // Add new scavenger hunt markers for ALL items (active and inactive)
-    for (var item in _scavengerHuntItems) {
-      final isClaimedByMe = _scavengerHuntService.isClaimedByCurrentUser(item);
-      final isClaimed = item.isClaimed;
-      final isEventActive = item.isEventActive;
+      // Add new scavenger hunt markers for ALL items (active and inactive)
+      for (var item in _scavengerHuntItems) {
+        if (_isDisposed) break; // Stop if disposed during iteration
+        
+        final isClaimedByMe = _scavengerHuntService.isClaimedByCurrentUser(item);
+        final isClaimed = item.isClaimed;
+        final isEventActive = item.isEventActive;
       
       // Determine marker color based on status
       BitmapDescriptor markerIcon;
@@ -194,8 +206,11 @@ class _MapScreenState extends State<MapScreen> {
       );
     }
 
-    if (mounted) {
+    if (mounted && !_isDisposed) {
       setState(() {});
+    }
+    } catch (e) {
+      print('Error updating scavenger hunt markers: $e');
     }
   }
 
@@ -758,15 +773,19 @@ class _MapScreenState extends State<MapScreen> {
                             onTap: () {
                               Navigator.pop(context);
                               // Zoom to item location
-                              _mapController.animateCamera(
-                                CameraUpdate.newLatLngZoom(
-                                  LatLng(item.latitude, item.longitude),
-                                  17,
-                                ),
-                              );
+                              if (_mapController != null && _mapReady) {
+                                _mapController?.animateCamera(
+                                  CameraUpdate.newLatLngZoom(
+                                    LatLng(item.latitude, item.longitude),
+                                    17,
+                                  ),
+                                );
+                              }
                               // Show item details
                               Future.delayed(const Duration(milliseconds: 500), () {
-                                _showScavengerHuntItemDetails(item);
+                                if (mounted) {
+                                  _showScavengerHuntItemDetails(item);
+                                }
                               });
                             },
                             borderRadius: BorderRadius.circular(12),
@@ -932,9 +951,9 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   void dispose() {
-    if (_mapReady) {
-      _mapController.dispose();
-    }
+    _isDisposed = true;
+    _scavengerHuntSubscription?.cancel();
+    _mapController?.dispose();
     super.dispose();
   }
 
@@ -985,7 +1004,7 @@ class _MapScreenState extends State<MapScreen> {
           _currentLocation = LatLng(position.latitude, position.longitude);
         });
 
-        _mapController.animateCamera(
+        _mapController?.animateCamera(
           CameraUpdate.newLatLngZoom(_currentLocation, 15),
         );
 
@@ -1002,9 +1021,11 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _getAddressFromCoordinates(double latitude, double longitude) async {
+    if (_isDisposed || !mounted) return;
+    
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(latitude, longitude);
-      if (placemarks.isNotEmpty && mounted) {
+      if (placemarks.isNotEmpty && mounted && !_isDisposed) {
         Placemark place = placemarks.first;
         final street = place.street ?? '';
         final locality = place.locality ?? place.subLocality ?? place.administrativeArea ?? '';
@@ -1026,7 +1047,7 @@ class _MapScreenState extends State<MapScreen> {
       }
     } catch (e) {
       // Silently fall back to coordinates if geocoding fails
-      if (mounted) {
+      if (mounted && !_isDisposed) {
         setState(() {
           _currentLocationName = 'Lat: ${latitude.toStringAsFixed(4)}, Lng: ${longitude.toStringAsFixed(4)}';
         });
@@ -1035,6 +1056,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _updateUserMarker() {
+    if (!mounted || _isDisposed) return;
+    
     setState(() {
       _markers.removeWhere((marker) => marker.markerId.value == 'user_location');
       _markers.add(
@@ -1081,52 +1104,58 @@ class _MapScreenState extends State<MapScreen> {
         destination: destinationLatLng,
       );
 
-      if (directionsData != null && mounted) {
-        final polylineCoordinates = directionsData['polylineCoordinates'] as List<LatLng>;
+      if (directionsData != null && mounted && !_isDisposed) {
+        final polylineCoordinates = directionsData['polylineCoordinates'] as List<LatLng>?;
         
-        setState(() {
-          _polylines.clear();
-          
-          _polylines.add(
-            Polyline(
-              polylineId: const PolylineId('route'),
-              points: polylineCoordinates,
-              color: Colors.blue,
-              width: 5,
-            ),
-          );
-
-          _routeDistance = directionsData['distance'] as String?;
-          _routeDuration = directionsData['duration'] as String?;
-          _destinationName = destinationAddress;
-
-          _markers.removeWhere((marker) => marker.markerId.value == 'destination');
-          _markers.add(
-            Marker(
-              markerId: const MarkerId('destination'),
-              position: destinationLatLng,
-              infoWindow: InfoWindow(
-                title: 'Destination',
-                snippet: destinationAddress,
+        if (polylineCoordinates != null && polylineCoordinates.isNotEmpty) {
+          setState(() {
+            _polylines.clear();
+            
+            _polylines.add(
+              Polyline(
+                polylineId: const PolylineId('route'),
+                points: polylineCoordinates,
+                color: Colors.blue,
+                width: 5,
               ),
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-            ),
-          );
-        });
+            );
 
-        _fitMapToBounds(polylineCoordinates);
+            _routeDistance = directionsData['distance'] as String?;
+            _routeDuration = directionsData['duration'] as String?;
+            _destinationName = destinationAddress;
+
+            _markers.removeWhere((marker) => marker.markerId.value == 'destination');
+            _markers.add(
+              Marker(
+                markerId: const MarkerId('destination'),
+                position: destinationLatLng,
+                infoWindow: InfoWindow(
+                  title: 'Destination',
+                  snippet: destinationAddress,
+                ),
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+              ),
+            );
+          });
+
+          _fitMapToBounds(polylineCoordinates);
+        }
       }
     } catch (e) {
-      if (mounted) {
+      print('Error drawing route: $e');
+      if (mounted && !_isDisposed) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error drawing route: $e')),
+          const SnackBar(
+            content: Text('Unable to draw route. Please try again.'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
     }
   }
 
   void _fitMapToBounds(List<LatLng> coordinates) {
-    if (coordinates.isEmpty || !_mapReady) return;
+    if (coordinates.isEmpty || !_mapReady || _mapController == null) return;
 
     double minLat = coordinates.first.latitude;
     double maxLat = coordinates.first.latitude;
@@ -1140,7 +1169,7 @@ class _MapScreenState extends State<MapScreen> {
       if (coord.longitude > maxLng) maxLng = coord.longitude;
     }
 
-    _mapController.animateCamera(
+    _mapController?.animateCamera(
       CameraUpdate.newLatLngBounds(
         LatLngBounds(
           southwest: LatLng(minLat, minLng),
@@ -1152,6 +1181,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _clearRoute() {
+    if (!mounted || _isDisposed) return;
+    
     setState(() {
       _polylines.clear();
       _routeDistance = null;
@@ -1172,20 +1203,21 @@ class _MapScreenState extends State<MapScreen> {
         children: [
           GoogleMap(
             onMapCreated: (controller) {
+              if (_isDisposed) return;
               _mapController = controller;
               _mapReady = true;
-              _mapController.animateCamera(
+              _mapController?.animateCamera(
                 CameraUpdate.newLatLngZoom(_currentLocation, 15),
               );
               _getUserLocation().then((_) {
-                if (hasActiveTransaction) {
+                if (hasActiveTransaction && !_isDisposed) {
                   _handleTransactionUpdate();
                 }
-                if (_showScavengerHunt) {
+                if (_showScavengerHunt && !_isDisposed) {
                   _updateScavengerHuntMarkers();
                 }
                 // Handle shared location if any
-                if (widget.sharedLocation != null) {
+                if (widget.sharedLocation != null && !_isDisposed) {
                   _handleSharedLocation();
                 }
               });
@@ -1701,6 +1733,7 @@ class _MapScreenState extends State<MapScreen> {
                     color: _showScavengerHunt ? Colors.white : Colors.black,
                   ),
                   onPressed: () {
+                    if (!mounted || _isDisposed) return;
                     setState(() {
                       _showScavengerHunt = !_showScavengerHunt;
                       if (_showScavengerHunt) {
@@ -1720,9 +1753,11 @@ class _MapScreenState extends State<MapScreen> {
                   mini: true,
                   child: const Icon(Icons.add, color: Colors.black),
                   onPressed: () {
-                    _mapController.animateCamera(
-                      CameraUpdate.zoomIn(),
-                    );
+                    if (_mapController != null && _mapReady) {
+                      _mapController?.animateCamera(
+                        CameraUpdate.zoomIn(),
+                      );
+                    }
                   },
                 ),
                 const SizedBox(height: 8),
@@ -1732,9 +1767,11 @@ class _MapScreenState extends State<MapScreen> {
                   mini: true,
                   child: const Icon(Icons.remove, color: Colors.black),
                   onPressed: () {
-                    _mapController.animateCamera(
-                      CameraUpdate.zoomOut(),
-                    );
+                    if (_mapController != null && _mapReady) {
+                      _mapController?.animateCamera(
+                        CameraUpdate.zoomOut(),
+                      );
+                    }
                   },
                 ),
                 const SizedBox(height: 8),
