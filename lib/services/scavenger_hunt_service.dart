@@ -204,6 +204,20 @@ class ScavengerHuntService {
     }
   }
 
+  // Automatically deactivate expired items
+  Future<void> deactivateExpiredItem(String itemId) async {
+    try {
+      await _firestore.collection('scavenger_hunt_items').doc(itemId).update({
+        'isActive': false,
+        'status': 'ended',
+      });
+      print('Expired item deactivated: $itemId');
+    } catch (e) {
+      print('Error deactivating expired item: $e');
+      // Don't rethrow - this is a background operation
+    }
+  }
+
   // Admin: Delete an item
   Future<void> deleteItem(String itemId) async {
     try {

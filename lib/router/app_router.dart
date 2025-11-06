@@ -10,6 +10,10 @@ import 'package:scalp_mobile_app/screens/signup_screen.dart';
 import 'package:scalp_mobile_app/screens/my_wishlist_screen.dart';
 import 'package:scalp_mobile_app/screens/my_items_screen.dart';
 import 'package:scalp_mobile_app/screens/splash_screen.dart';
+import 'package:scalp_mobile_app/screens/sold_items_screen.dart';
+import 'package:scalp_mobile_app/screens/wishlist_items_screen.dart';
+import 'package:scalp_mobile_app/screens/create_scavenger_hunt_screen.dart';
+import 'package:scalp_mobile_app/screens/manage_scavenger_hunt_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -73,6 +77,22 @@ class AppRouter {
       GoRoute(
         path: '/my-items',
         builder: (context, state) => const MyItemsScreen(),
+      ),
+      GoRoute(
+        path: '/sold-items',
+        builder: (context, state) => SoldItemsScreen(),
+      ),
+      GoRoute(
+        path: '/wishlist-items',
+        builder: (context, state) => WishlistItemsScreen(),
+      ),
+      GoRoute(
+        path: '/create-scavenger-hunt',
+        builder: (context, state) => const CreateScavengerHuntScreen(),
+      ),
+      GoRoute(
+        path: '/manage-scavenger-hunt',
+        builder: (context, state) => ManageScavengerHuntScreen(),
       ),
     ],
   );
