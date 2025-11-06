@@ -77,376 +77,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       print('Error fetching statistics: $e');
     }
   }
-  
-  void _showSoldItemsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        child: Container(
-          constraints: const BoxConstraints(maxHeight: 600, maxWidth: 500),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Sold Items',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: currentUser != null
-                      ? _firestore
-                          .collection('listings')
-                          .where('userId', isEqualTo: currentUser!.uid)
-                          .where('isSold', isEqualTo: true)
-                          .snapshots()
-                      : null,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Text(
-                            'Error loading sold items: ${snapshot.error}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      );
-                    }
-                    
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(24.0),
-                          child: Text(
-                            'No sold items yet.\nMark items as sold to see them here!',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ),
-                      );
-                    }
-                    
-                    // Sort sold items by soldAt on client side
-                    final soldItems = snapshot.data!.docs.toList();
-                    soldItems.sort((a, b) {
-                      final aData = a.data() as Map<String, dynamic>;
-                      final bData = b.data() as Map<String, dynamic>;
-                      final aTime = aData['soldAt'] as Timestamp?;
-                      final bTime = bData['soldAt'] as Timestamp?;
-                      
-                      if (aTime == null && bTime == null) return 0;
-                      if (aTime == null) return 1;
-                      if (bTime == null) return -1;
-                      
-                      return bTime.compareTo(aTime); // Descending order
-                    });
-                    
-                    return ListView.builder(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: soldItems.length,
-                      itemBuilder: (context, index) {
-                        final doc = soldItems[index];
-                        final data = doc.data() as Map<String, dynamic>;
-                        final soldAt = data['soldAt'] as Timestamp?;
-                        
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                          child: ListTile(
-                            leading: Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                image: DecorationImage(
-                                  image: data['imageUrl'] != null && !data['imageUrl'].toString().startsWith('assets/')
-                                      ? NetworkImage(data['imageUrl'])
-                                      : const AssetImage('images/placeholder.png') as ImageProvider,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                            title: Text(
-                              data['title'] ?? 'No Title',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(data['category'] ?? 'No Category'),
-                                if (soldAt != null)
-                                  Text(
-                                    'Sold: ${_formatDate(soldAt.toDate())}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            trailing: Text(
-                              '₱${data['price']?.toString() ?? '0'}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  
-  void _showWishlistItemsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        child: Container(
-          constraints: const BoxConstraints(maxHeight: 600, maxWidth: 500),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'My Wishlist',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: currentUser != null
-                      ? _firestore
-                          .collection('wishlists')
-                          .doc(currentUser!.uid)
-                          .collection('items')
-                          .snapshots()
-                      : null,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Text(
-                            'Error loading wishlist: ${snapshot.error}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      );
-                    }
-                    
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(24.0),
-                          child: Text(
-                            'No items in wishlist yet.\nAdd items to see them here!',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ),
-                      );
-                    }
-                    
-                    // Sort by addedAt on client side
-                    final wishlistItems = snapshot.data!.docs.toList();
-                    wishlistItems.sort((a, b) {
-                      final aData = a.data() as Map<String, dynamic>;
-                      final bData = b.data() as Map<String, dynamic>;
-                      final aTime = aData['addedAt'] as Timestamp?;
-                      final bTime = bData['addedAt'] as Timestamp?;
-                      
-                      if (aTime == null && bTime == null) return 0;
-                      if (aTime == null) return 1;
-                      if (bTime == null) return -1;
-                      
-                      return bTime.compareTo(aTime); // Descending order
-                    });
-                    
-                    return ListView.builder(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: wishlistItems.length,
-                      itemBuilder: (context, index) {
-                        final doc = wishlistItems[index];
-                        final data = doc.data() as Map<String, dynamic>;
-                        final title = data['title'] ?? 'Unknown Item';
-                        final price = data['price'] ?? 0.0;
-                        final imageUrl = data['imageUrl'] ?? 'assets/images/placeholder.png';
-                        final addedAt = data['addedAt'] as Timestamp?;
-                        
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                          child: ListTile(
-                            leading: Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                image: DecorationImage(
-                                  image: imageUrl.startsWith('assets/')
-                                      ? const AssetImage('assets/images/placeholder.png') as ImageProvider
-                                      : NetworkImage(imageUrl),
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                            title: Text(
-                              title,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (addedAt != null)
-                                  Text(
-                                    'Added: ${_formatDate(addedAt.toDate())}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '₱${price.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.red,
-                                    size: 20,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
-                                    minWidth: 32,
-                                    minHeight: 32,
-                                  ),
-                                  onPressed: () async {
-                                    final confirm = await showDialog<bool>(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('Remove from Wishlist'),
-                                        content: Text('Remove "$title" from your wishlist?'),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context, false),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(context, true),
-                                            child: const Text(
-                                              'Remove',
-                                              style: TextStyle(color: Colors.red),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
 
-                                    if (confirm == true && currentUser != null) {
-                                      try {
-                                        await _firestore
-                                            .collection('wishlists')
-                                            .doc(currentUser!.uid)
-                                            .collection('items')
-                                            .doc(doc.id)
-                                            .delete();
-                                        
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Item removed from wishlist'),
-                                            ),
-                                          );
-                                        }
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text('Error: $e'),
-                                            ),
-                                          );
-                                        }
-                                      }
-                                    }
-                                  },
-                                ),
-                              ],
-                            ),
-                            onTap: () {
-                              Navigator.of(context).pop();
-                              context.push('/listing');
-                            },
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
@@ -568,9 +199,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         child: GestureDetector(
           onTap: () {
             if (title == 'Items sold') {
-              _showSoldItemsDialog(context);
+              context.push('/sold-items');
             } else if (title == 'Wishlist Items') {
-              _showWishlistItemsDialog(context);
+              context.push('/wishlist-items');
             } else {
               showDialog(
                 context: context,
@@ -1100,7 +731,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         children: [
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: () => _showCreateScavengerHuntDialog(context),
+                              onPressed: () => context.push('/create-scavenger-hunt'),
                               icon: const Icon(Icons.add, size: 18),
                               label: const Text(
                                 'Create',
@@ -1122,7 +753,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: () => _showManageScavengerHuntDialog(context),
+                              onPressed: () => context.push('/manage-scavenger-hunt'),
                               icon: const Icon(Icons.manage_search, size: 18),
                               label: const Text(
                                 'Manage',
@@ -1154,8 +785,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  void _showCreateScavengerHuntDialog(BuildContext context) {
-    final titleController = TextEditingController();
+  String _formatDuration(Duration duration) {
+    if (duration.inDays > 0) {
+      return '${duration.inDays}d ${duration.inHours.remainder(24)}h';
+    } else if (duration.inHours > 0) {
+      return '${duration.inHours}h ${duration.inMinutes.remainder(60)}m';
+    } else if (duration.inMinutes > 0) {
+      return '${duration.inMinutes}m';
+    } else {
+      return '${duration.inSeconds}s';
+    }
+  }
+}
     final priceController = TextEditingController();
     final descriptionController = TextEditingController();
     final quantityController = TextEditingController(text: '1');
