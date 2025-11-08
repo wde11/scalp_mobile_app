@@ -11,6 +11,7 @@ import 'package:scalp_mobile_app/services/scavenger_hunt_service.dart';
 import 'package:scalp_mobile_app/models/scavenger_hunt_item.dart';
 import 'package:scalp_mobile_app/globals.dart';
 import 'dart:async';
+import 'dart:math';
 
 class MapScreen extends StatefulWidget {
   final models.Transaction? activeTransaction;
@@ -38,11 +39,20 @@ class _MapScreenState extends State<MapScreen> {
   bool _showScavengerHunt = true; // Toggle to show/hide scavenger hunt items
   StreamSubscription<List<ScavengerHuntItem>>? _scavengerHuntSubscription;
   bool _isDisposed = false;
+  bool _isLoadingMarkers = false;
+  static const int _maxMarkersToDisplay = 50; // Limit markers to prevent memory issues
+  Timer? _debounceTimer;
 
   @override
   void initState() {
     super.initState();
-    _loadScavengerHuntItems();
+    
+    // Delay loading scavenger hunt items to prevent initial memory spike
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted && !_isDisposed) {
+        _loadScavengerHuntItems();
+      }
+    });
     
     // Check if there's a shared location to show
     if (widget.sharedLocation != null) {
@@ -75,9 +85,15 @@ class _MapScreenState extends State<MapScreen> {
     _scavengerHuntSubscription?.cancel();
     _scavengerHuntSubscription = _scavengerHuntService.getAllItems().listen((items) {
       if (mounted && !_isDisposed) {
-        setState(() {
-          _scavengerHuntItems = items;
-          _updateScavengerHuntMarkers();
+        // Debounce rapid updates
+        _debounceTimer?.cancel();
+        _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+          if (mounted && !_isDisposed) {
+            setState(() {
+              _scavengerHuntItems = items;
+              _updateScavengerHuntMarkers();
+            });
+          }
         });
       }
     }, onError: (error) {
@@ -155,15 +171,41 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _updateScavengerHuntMarkers() async {
-    if (!_showScavengerHunt || !_mapReady || _isDisposed) return;
+    if (!_showScavengerHunt || !_mapReady || _isDisposed || _isLoadingMarkers) return;
 
+    _isLoadingMarkers = true;
+    
     try {
       // Remove old scavenger hunt markers
       _markers.removeWhere((marker) => 
         marker.markerId.value.startsWith('scavenger_'));
 
-      // Add new scavenger hunt markers for ALL items (active and inactive)
-      for (var item in _scavengerHuntItems) {
+      // Limit the number of markers to display (closest to user location)
+      List<ScavengerHuntItem> itemsToDisplay = _scavengerHuntItems;
+      
+      if (_scavengerHuntItems.length > _maxMarkersToDisplay) {
+        // Sort by distance from current location
+        itemsToDisplay = List.from(_scavengerHuntItems);
+        itemsToDisplay.sort((a, b) {
+          final distA = _calculateDistance(
+            _currentLocation.latitude, 
+            _currentLocation.longitude,
+            a.latitude, 
+            a.longitude
+          );
+          final distB = _calculateDistance(
+            _currentLocation.latitude, 
+            _currentLocation.longitude,
+            b.latitude, 
+            b.longitude
+          );
+          return distA.compareTo(distB);
+        });
+        itemsToDisplay = itemsToDisplay.take(_maxMarkersToDisplay).toList();
+      }
+
+      // Add new scavenger hunt markers (limited set)
+      for (var item in itemsToDisplay) {
         if (_isDisposed) break; // Stop if disposed during iteration
         
         final isClaimedByMe = _scavengerHuntService.isClaimedByCurrentUser(item);
@@ -211,7 +253,27 @@ class _MapScreenState extends State<MapScreen> {
     }
     } catch (e) {
       print('Error updating scavenger hunt markers: $e');
+    } finally {
+      _isLoadingMarkers = false;
     }
+  }
+
+  // Calculate distance between two coordinates (in km)
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371; // km
+    final dLat = _toRadians(lat2 - lat1);
+    final dLon = _toRadians(lon2 - lon1);
+    
+    final a = (sin(dLat / 2) * sin(dLat / 2)) +
+        cos(_toRadians(lat1)) * cos(_toRadians(lat2)) *
+        (sin(dLon / 2) * sin(dLon / 2));
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    
+    return earthRadius * c;
+  }
+
+  double _toRadians(double degrees) {
+    return degrees * pi / 180;
   }
 
   void _showScavengerHuntItemDetails(ScavengerHuntItem item) {
@@ -261,6 +323,22 @@ class _MapScreenState extends State<MapScreen> {
                       height: 200,
                       width: double.infinity,
                       fit: BoxFit.cover,
+                      cacheWidth: 800, // Limit image resolution
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          height: 200,
+                          color: Colors.grey[200],
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                      loadingProgress.expectedTotalBytes!
+                                  : null,
+                            ),
+                          ),
+                        );
+                      },
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
                           height: 200,
@@ -642,6 +720,9 @@ class _MapScreenState extends State<MapScreen> {
     final activeItems = _scavengerHuntItems.where((item) => 
       item.isActive && item.isEventActive
     ).toList();
+    
+    // Limit items shown to prevent memory issues
+    final limitedItems = activeItems.take(20).toList();
 
     showModalBottomSheet(
       context: context,
@@ -703,7 +784,7 @@ class _MapScreenState extends State<MapScreen> {
                               ),
                             ),
                             Text(
-                              '${activeItems.length} items available',
+                              '${limitedItems.length} items available${activeItems.length > 20 ? ' (showing 20)' : ''}',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Colors.white.withOpacity(0.9),
@@ -757,9 +838,9 @@ class _MapScreenState extends State<MapScreen> {
                   : ListView.builder(
                       controller: scrollController,
                       padding: const EdgeInsets.all(16),
-                      itemCount: activeItems.length,
+                      itemCount: limitedItems.length,
                       itemBuilder: (context, index) {
-                        final item = activeItems[index];
+                        final item = limitedItems[index];
                         final isClaimedByMe = _scavengerHuntService.isClaimedByCurrentUser(item);
                         final timeRemaining = item.timeRemaining;
                         
@@ -802,6 +883,8 @@ class _MapScreenState extends State<MapScreen> {
                                             width: 70,
                                             height: 70,
                                             fit: BoxFit.cover,
+                                            cacheWidth: 200, // Reduced resolution for thumbnails
+                                            cacheHeight: 200,
                                             errorBuilder: (context, error, stackTrace) {
                                               return Container(
                                                 width: 70,
@@ -952,7 +1035,17 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void dispose() {
     _isDisposed = true;
+    _debounceTimer?.cancel();
     _scavengerHuntSubscription?.cancel();
+    
+    // Clear image cache to prevent memory leaks
+    try {
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+    } catch (e) {
+      print('Error clearing image cache: $e');
+    }
+    
     _mapController?.dispose();
     super.dispose();
   }
@@ -1206,16 +1299,26 @@ class _MapScreenState extends State<MapScreen> {
               if (_isDisposed) return;
               _mapController = controller;
               _mapReady = true;
-              _mapController?.animateCamera(
-                CameraUpdate.newLatLngZoom(_currentLocation, 15),
-              );
+              
+              // Delay initial camera animation to reduce load
+              Future.delayed(const Duration(milliseconds: 100), () {
+                if (_mapController != null && !_isDisposed) {
+                  _mapController?.animateCamera(
+                    CameraUpdate.newLatLngZoom(_currentLocation, 15),
+                  );
+                }
+              });
+              
               _getUserLocation().then((_) {
                 if (hasActiveTransaction && !_isDisposed) {
                   _handleTransactionUpdate();
                 }
-                if (_showScavengerHunt && !_isDisposed) {
-                  _updateScavengerHuntMarkers();
-                }
+                // Delay marker loading
+                Future.delayed(const Duration(milliseconds: 300), () {
+                  if (_showScavengerHunt && !_isDisposed) {
+                    _updateScavengerHuntMarkers();
+                  }
+                });
                 // Handle shared location if any
                 if (widget.sharedLocation != null && !_isDisposed) {
                   _handleSharedLocation();
@@ -1231,6 +1334,12 @@ class _MapScreenState extends State<MapScreen> {
             myLocationEnabled: false,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
+            mapToolbarEnabled: false, // Disable map toolbar
+            compassEnabled: false, // Disable compass
+            tiltGesturesEnabled: false, // Disable tilt for performance
+            rotateGesturesEnabled: false, // Disable rotation for performance
+            buildingsEnabled: false, // Disable 3D buildings for performance
+            trafficEnabled: false, // Disable traffic
           ),
 
           if (hasActiveTransaction)
